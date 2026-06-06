@@ -3,8 +3,7 @@ services:
   # ── JellyLogin ────────────────────────────────────────────────────────────
   jellylogin:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: https://github.com/Domekologe/Jellylogin.git#main
     image: jellylogin:latest
     container_name: jellylogin
     restart: unless-stopped
@@ -25,7 +24,7 @@ services:
 
   # ── Jellyfin (optional, auskommentiert) ────────────────────────────────────
   # Entferne die Kommentare um Jellyfin mitzustarten.
-  # Das DKS JellyLogin SSO Plugin muss separat in Jellyfin installiert werden.
+  # Das JellyLogin SSO Plugin muss separat in Jellyfin installiert werden.
   #
   # jellyfin:
   #   image: jellyfin/jellyfin:latest

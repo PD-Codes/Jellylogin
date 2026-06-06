@@ -6,15 +6,13 @@ LABEL version="1.0.0"
 
 WORKDIR /app
 
-# Install build dependencies (only needed for hatchling build backend)
-RUN pip install --no-cache-dir hatchling
+# Install dependencies first — separate layer so Docker cache skips this
+# on source-only changes
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project files
-COPY pyproject.toml MANIFEST.in ./
+# Copy application source
 COPY jellylogin/ ./jellylogin/
-
-# Install the app
-RUN pip install --no-cache-dir .
 
 # Runtime environment
 ENV JELLYLOGIN_DATA=/data
@@ -31,4 +29,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=5)" \
   || exit 1
 
-CMD ["jellylogin", "--host", "0.0.0.0", "--port", "5000"]
+CMD ["python", "-c", "from jellylogin.app import main; main()"]
