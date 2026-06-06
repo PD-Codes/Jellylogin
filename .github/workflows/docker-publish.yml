@@ -1,0 +1,98 @@
+name: Build & Publish Docker Image
+
+# Runs when a version tag is pushed (e.g. v1.0.0, v1.2.3)
+# Can also be triggered manually via the Actions tab.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to publish (e.g. edge)"
+        required: false
+        default: "edge"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}   # → ghcr.io/<owner>/jellylogin
+
+jobs:
+  build-and-push:
+    name: Build & push to GHCR
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write   # required to push to ghcr.io
+
+    steps:
+      # ── 1. Source ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Multi-platform support ─────────────────────────────────────────────
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── 3. Authenticate ───────────────────────────────────────────────────────
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 4. Derive image tags & OCI labels ─────────────────────────────────────
+      #
+      # For a tag push of v1.2.3 this produces:
+      #   ghcr.io/<owner>/jellylogin:1.2.3
+      #   ghcr.io/<owner>/jellylogin:1.2
+      #   ghcr.io/<owner>/jellylogin:1
+      #   ghcr.io/<owner>/jellylogin:latest
+      #
+      # For a manual workflow_dispatch it produces:
+      #   ghcr.io/<owner>/jellylogin:<input tag>
+      #
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Semver tags from Git tag (v1.2.3 → 1.2.3 / 1.2 / 1)
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !startsWith(github.ref, 'refs/tags/v0.') }}
+            # Always tag latest on a real version release
+            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
+            # Manual dispatch: use the provided tag input
+            type=raw,value=${{ github.event.inputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' }}
+
+      # ── 5. Build & push ───────────────────────────────────────────────────────
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # GitHub Actions cache — speeds up repeated builds significantly
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # ── 6. Summary ────────────────────────────────────────────────────────────
+      - name: Write job summary
+        run: |
+          echo "## Docker image published 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Registry:** \`${{ env.REGISTRY }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags pushed:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
