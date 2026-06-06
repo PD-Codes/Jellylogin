@@ -1,0 +1,109 @@
+{% extends "admin/layout.html" %}
+{% block title %}Jellyfin — Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-page">
+  <div class="admin-page-header">
+    <h1 class="admin-page-title"><i class="fas fa-server"></i> Jellyfin Integration</h1>
+  </div>
+
+  <div class="admin-section">
+    <div class="info-card info-card--blue">
+      <i class="fas fa-circle-info"></i>
+      <div>
+        <strong>Jellyfin-Anmeldung</strong> ermöglicht es Benutzern, sich mit ihren Jellyfin-Zugangsdaten
+        anzumelden. Der erste Admin-Account bleibt immer ein lokaler Account.
+      </div>
+    </div>
+  </div>
+
+  <form method="post" class="admin-section">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="action" value="save">
+
+    <h2 class="admin-section-title">Server-Konfiguration</h2>
+    <div class="form-grid">
+      <div class="form-group form-group--span2">
+        <label for="server_url">Jellyfin Server-URL <span class="required">*</span></label>
+        <input type="url" id="server_url" name="server_url"
+               value="{{ cfg.server_url }}" required
+               placeholder="http://192.168.1.100:8096">
+        <span class="form-hint">Interne oder externe URL deines Jellyfin-Servers</span>
+      </div>
+
+      <div class="form-group form-group--span2">
+        <label for="api_key">API-Schlüssel <span class="required">*</span></label>
+        <div class="input-wrapper">
+          <i class="fas fa-key input-icon"></i>
+          <input type="password" id="api_key" name="api_key"
+                 value="{{ cfg.api_key }}"
+                 placeholder="Jellyfin API-Schlüssel">
+          <button type="button" class="input-toggle-pw" tabindex="-1"><i class="fas fa-eye"></i></button>
+        </div>
+        <span class="form-hint">Erstelle einen API-Schlüssel unter Jellyfin → Dashboard → API-Schlüssel</span>
+      </div>
+    </div>
+
+    <h2 class="admin-section-title" style="margin-top:2rem">Anmeldeoptionen</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <div class="form-check form-check--big">
+          <input type="checkbox" id="allow_jellyfin_login" name="allow_jellyfin_login"
+                 {{ 'checked' if allow_jf }}>
+          <label for="allow_jellyfin_login">
+            <span class="check-title">Jellyfin-Login aktivieren</span>
+            <span class="check-desc">Benutzer können sich mit Jellyfin-Zugangsdaten anmelden</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-check form-check--big">
+          <input type="checkbox" id="auto_create_users" name="auto_create_users"
+                 {{ 'checked' if cfg.auto_create_users }}>
+          <label for="auto_create_users">
+            <span class="check-title">Benutzer automatisch anlegen</span>
+            <span class="check-desc">Neuer Jellyfin-Benutzer wird beim ersten Login erstellt</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="default_role">Standard-Rolle für neue Jellyfin-Benutzer</label>
+        <select id="default_role" name="default_role">
+          <option value="user" {{ 'selected' if cfg.default_role == 'user' }}>Benutzer</option>
+          <option value="admin" {{ 'selected' if cfg.default_role == 'admin' }}>Admin</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn--primary">
+        <i class="fas fa-floppy-disk"></i> Einstellungen speichern
+      </button>
+    </div>
+  </form>
+
+  <!-- Test & Sync -->
+  <div class="admin-section">
+    <h2 class="admin-section-title">Verbindung testen & Benutzer synchronisieren</h2>
+    <div class="action-row">
+      <form method="post" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="test">
+        <button type="submit" class="btn btn--outline">
+          <i class="fas fa-plug"></i> Verbindung testen
+        </button>
+      </form>
+      <form method="post" class="inline-form"
+            onsubmit="return confirm('Jellyfin-Benutzer importieren? Bestehende Benutzer werden nicht überschrieben.')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="sync">
+        <button type="submit" class="btn btn--outline">
+          <i class="fas fa-arrows-rotate"></i> Benutzer synchronisieren
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

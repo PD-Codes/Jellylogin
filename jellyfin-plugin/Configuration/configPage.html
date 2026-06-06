@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <title>DKS JellyLogin SSO</title>
+</head>
+<body>
+<div data-role="page" class="page type-interior pluginConfigurationPage"
+     data-require="emby-input,emby-button,emby-select,emby-checkbox">
+  <div data-role="content">
+    <div class="content-primary">
+
+      <form id="JellyLoginConfigForm">
+
+        <div class="sectionTitleContainer flex align-items-center" style="margin-bottom:1.5em">
+          <h2 class="sectionTitle">🎬 DKS JellyLogin SSO</h2>
+        </div>
+
+        <p style="color:#aaa;margin-bottom:1.5em">
+          Authentifiziert Jellyfin-Nutzer gegen eine laufende
+          <strong>DKS JellyLogin</strong>-Instanz. Nutzer melden sich mit ihren
+          JellyLogin-Zugangsdaten an.<br><br>
+          Das Plugin-Secret findest du in JellyLogin unter
+          <em>Admin → Einstellungen → Jellyfin SSO Plugin</em>.
+        </p>
+
+        <!-- Enable/Disable -->
+        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:1em">
+          <label class="emby-checkbox-label">
+            <input id="Enabled" name="Enabled" type="checkbox" is="emby-checkbox" />
+            <span>Plugin aktivieren</span>
+          </label>
+          <div class="fieldDescription">
+            Schaltet diesen Authentifizierungs-Anbieter an oder aus.
+          </div>
+        </div>
+
+        <!-- Server URL -->
+        <div class="inputContainer" style="margin-bottom:1em">
+          <label class="inputLabel inputLabelUnfocused" for="ServerUrl">
+            JellyLogin Server-URL
+          </label>
+          <input id="ServerUrl" name="ServerUrl" type="url" is="emby-input"
+                 required placeholder="http://192.168.1.100:5000" />
+          <div class="fieldDescription">
+            Basis-URL deiner DKS JellyLogin Instanz (kein abschließendes /).
+          </div>
+        </div>
+
+        <!-- Plugin Secret -->
+        <div class="inputContainer" style="margin-bottom:1em">
+          <label class="inputLabel inputLabelUnfocused" for="PluginSecret">
+            Plugin-Secret
+          </label>
+          <input id="PluginSecret" name="PluginSecret" type="password" is="emby-input"
+                 required placeholder="Secret aus JellyLogin Admin → Einstellungen" />
+          <div class="fieldDescription">
+            Shared Secret zur Absicherung des Plugin-Endpunkts.
+            Kopiere es aus den JellyLogin Admin-Einstellungen.
+          </div>
+        </div>
+
+        <!-- Auto-create users -->
+        <div class="checkboxContainer checkboxContainer-withDescription" style="margin-bottom:1.5em">
+          <label class="emby-checkbox-label">
+            <input id="CreateUsersOnFirstLogin" name="CreateUsersOnFirstLogin"
+                   type="checkbox" is="emby-checkbox" />
+            <span>Benutzer bei erstem Login automatisch erstellen</span>
+          </label>
+          <div class="fieldDescription">
+            Erstellt einen neuen Jellyfin-Account, wenn sich ein JellyLogin-Nutzer
+            zum ersten Mal anmeldet und noch kein entsprechender Jellyfin-Account existiert.
+          </div>
+        </div>
+
+        <!-- Test connection button -->
+        <div style="margin-bottom:1.5em">
+          <button is="emby-button" type="button" class="raised emby-button"
+                  id="TestConnectionBtn" onclick="testConnection()">
+            <i class="md-icon">wifi</i>
+            Verbindung testen
+          </button>
+          <span id="TestResult" style="margin-left:1em;font-size:.9em"></span>
+        </div>
+
+        <!-- Save button -->
+        <div>
+          <button is="emby-button" type="submit"
+                  class="raised button-submit block emby-button">
+            <span>Speichern</span>
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <script type="text/javascript">
+    var PLUGIN_ID = 'c3a7f210-4d8e-4b5a-9f62-1a2b3c4d5e6f';
+
+    // ── Load saved config ──────────────────────────────────────────────────
+    Dashboard.showLoadingMsg();
+    ApiClient.getPluginConfiguration(PLUGIN_ID).then(function (config) {
+      document.getElementById('Enabled').checked              = config.Enabled !== false;
+      document.getElementById('ServerUrl').value              = config.ServerUrl || '';
+      document.getElementById('PluginSecret').value           = config.PluginSecret || '';
+      document.getElementById('CreateUsersOnFirstLogin').checked =
+        config.CreateUsersOnFirstLogin !== false;
+      Dashboard.hideLoadingMsg();
+    });
+
+    // ── Save config ────────────────────────────────────────────────────────
+    document.getElementById('JellyLoginConfigForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      Dashboard.showLoadingMsg();
+
+      ApiClient.getPluginConfiguration(PLUGIN_ID).then(function (config) {
+        config.Enabled                = document.getElementById('Enabled').checked;
+        config.ServerUrl              = document.getElementById('ServerUrl').value.replace(/\/$/, '');
+        config.PluginSecret           = document.getElementById('PluginSecret').value;
+        config.CreateUsersOnFirstLogin = document.getElementById('CreateUsersOnFirstLogin').checked;
+
+        ApiClient.updatePluginConfiguration(PLUGIN_ID, config).then(function () {
+          Dashboard.processPluginConfigurationUpdateResult();
+        });
+      });
+
+      return false;
+    });
+
+    // ── Test connection ────────────────────────────────────────────────────
+    function testConnection() {
+      var url    = document.getElementById('ServerUrl').value.replace(/\/$/, '');
+      var result = document.getElementById('TestResult');
+
+      if (!url) { result.textContent = '⚠ Bitte Server-URL eingeben.'; return; }
+
+      result.textContent = '⏳ Teste Verbindung…';
+
+      fetch(url + '/health', { method: 'GET', signal: AbortSignal.timeout(6000) })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          if (data && data.status === 'ok') {
+            result.style.color = '#4CAF50';
+            result.textContent = '✓ Verbindung erfolgreich! (JellyLogin v' + (data.version || '?') + ')';
+          } else {
+            result.style.color = '#FF9800';
+            result.textContent = '⚠ Server antwortet, aber unerwartetes Format.';
+          }
+        })
+        .catch(function (err) {
+          result.style.color = '#F44336';
+          result.textContent = '✗ Verbindung fehlgeschlagen: ' + err.message;
+        });
+    }
+  </script>
+</div>
+</body>
+</html>

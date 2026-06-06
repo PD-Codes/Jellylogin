@@ -1,0 +1,52 @@
+services:
+
+  # ── JellyLogin ────────────────────────────────────────────────────────────
+  jellylogin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jellylogin:latest
+    container_name: jellylogin
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - jellylogin_data:/data
+    environment:
+      JELLYLOGIN_DATA: /data
+      # JELLYLOGIN_HTTPS: "1"   # Aktivieren wenn hinter HTTPS-Proxy (nginx/traefik)
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Jellyfin (optional, auskommentiert) ────────────────────────────────────
+  # Entferne die Kommentare um Jellyfin mitzustarten.
+  # Das DKS JellyLogin SSO Plugin muss separat in Jellyfin installiert werden.
+  #
+  # jellyfin:
+  #   image: jellyfin/jellyfin:latest
+  #   container_name: jellyfin
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8096:8096"
+  #     - "8920:8920"   # HTTPS (optional)
+  #     - "7359:7359/udp"  # Auto-Discovery
+  #   volumes:
+  #     - jellyfin_config:/config
+  #     - jellyfin_cache:/cache
+  #     - /pfad/zu/deinen/medien:/media:ro   # ← ANPASSEN
+  #   environment:
+  #     - JELLYFIN_PublishedServerUrl=http://192.168.1.100:8096   # ← ANPASSEN
+  #   depends_on:
+  #     jellylogin:
+  #       condition: service_healthy
+
+volumes:
+  jellylogin_data:
+    driver: local
+  # jellyfin_config:
+  # jellyfin_cache:

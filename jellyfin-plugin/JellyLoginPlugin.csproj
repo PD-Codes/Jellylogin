@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>JellyLoginPlugin</AssemblyName>
+    <RootNamespace>JellyLogin.Plugin</RootNamespace>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Deterministic>true</Deterministic>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!-- Jellyfin dependencies are provided at runtime, do not bundle them -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Target Jellyfin 10.9.x — adjust version to match your Jellyfin installation -->
+    <PackageReference Include="Jellyfin.Controller" Version="10.9.11" />
+    <PackageReference Include="Jellyfin.Common"    Version="10.9.11" />
+    <PackageReference Include="Jellyfin.Model"     Version="10.9.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Embed the config page HTML into the assembly -->
+    <EmbeddedResource Include="Configuration\configPage.html" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block body %}
+<!-- Admin Navbar -->
+<nav class="navbar navbar--admin">
+  <div class="navbar-brand">
+    <a href="{{ url_for('auth.dashboard') }}" class="navbar-back" title="Zum Dashboard">
+      <i class="fas fa-arrow-left"></i>
+    </a>
+    <i class="fas fa-play-circle navbar-logo"></i>
+    <span class="navbar-title">{{ site_name }}</span>
+    <span class="admin-badge">Admin</span>
+  </div>
+  <div class="navbar-end">
+    <div class="user-menu">
+      <button class="user-btn" id="user-menu-btn">
+        <div class="user-avatar">{{ username[0]|upper }}</div>
+        <span class="user-name">{{ username }}</span>
+        <i class="fas fa-chevron-down user-chevron"></i>
+      </button>
+      <div class="user-dropdown" id="user-dropdown">
+        <div class="user-dropdown-header">
+          <div class="user-avatar user-avatar--lg">{{ username[0]|upper }}</div>
+          <div>
+            <div class="user-dropdown-name">{{ username }}</div>
+            <div class="user-dropdown-role">Administrator</div>
+          </div>
+        </div>
+        <div class="user-dropdown-divider"></div>
+        <a href="{{ url_for('auth.dashboard') }}" class="user-dropdown-item">
+          <i class="fas fa-house"></i>
+          Dashboard
+        </a>
+        <a href="{{ url_for('auth.logout') }}" class="user-dropdown-item user-dropdown-item--danger">
+          <i class="fas fa-right-from-bracket"></i>
+          Abmelden
+        </a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- Admin Sub-Nav -->
+<div class="admin-subnav">
+  <a href="{{ url_for('admin.index') }}"
+     class="admin-subnav-item {{ 'active' if request.endpoint == 'admin.index' }}">
+    <i class="fas fa-chart-pie"></i>
+    Übersicht
+  </a>
+  <a href="{{ url_for('admin.links') }}"
+     class="admin-subnav-item {{ 'active' if request.endpoint in ('admin.links','admin.create_link','admin.edit_link') }}">
+    <i class="fas fa-link"></i>
+    Links
+  </a>
+  <a href="{{ url_for('admin.users') }}"
+     class="admin-subnav-item {{ 'active' if 'admin.user' in request.endpoint or request.endpoint == 'admin.users' }}">
+    <i class="fas fa-users"></i>
+    Benutzer
+  </a>
+  <a href="{{ url_for('admin.jellyfin') }}"
+     class="admin-subnav-item {{ 'active' if request.endpoint == 'admin.jellyfin' }}">
+    <i class="fas fa-server"></i>
+    Jellyfin
+  </a>
+  <a href="{{ url_for('admin.login_design') }}"
+     class="admin-subnav-item {{ 'active' if request.endpoint == 'admin.login_design' }}">
+    <i class="fas fa-paintbrush"></i>
+    Login-Design
+  </a>
+  <a href="{{ url_for('admin.settings') }}"
+     class="admin-subnav-item {{ 'active' if request.endpoint == 'admin.settings' }}">
+    <i class="fas fa-gear"></i>
+    Einstellungen
+  </a>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <div class="flash-container">
+    {% for category, message in messages %}
+    <div class="alert alert--{{ category }} alert--dismissible">
+      <i class="fas fa-{{ 'circle-check' if category == 'success' else ('circle-exclamation' if category == 'error' else 'circle-info') }}"></i>
+      {{ message }}
+      <button class="alert-close" onclick="this.parentElement.remove()"><i class="fas fa-xmark"></i></button>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+{% endwith %}
+
+<main class="admin-main">
+  {% block admin_content %}{% endblock %}
+</main>
+{% endblock %}

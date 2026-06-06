@@ -1,0 +1,419 @@
+{% extends "admin/layout.html" %}
+{% block title %}Login-Design — Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-page">
+  <div class="admin-page-header">
+    <h1 class="admin-page-title"><i class="fas fa-paintbrush"></i> Login-Seite gestalten</h1>
+  </div>
+
+  <div class="design-workspace">
+
+    <!-- ── Left: Controls ──────────────────────────────────────────────────── -->
+    <div>
+      <form method="post" id="design-form" class="admin-section">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="login_bg_value" id="login_bg_value_hidden" value="{{ login_bg_value }}">
+
+        <!-- Logo -->
+        <h2 class="admin-section-title">Logo</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="login_logo_type">Logo-Typ</label>
+            <select id="login_logo_type" name="login_logo_type" onchange="updateLogoFields();updatePreview()">
+              <option value="icon"  {{ 'selected' if login_logo_type == 'icon' }}>Font Awesome Icon</option>
+              <option value="image" {{ 'selected' if login_logo_type == 'image' }}>Bild / Upload</option>
+              <option value="none"  {{ 'selected' if login_logo_type == 'none' }}>Kein Logo</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="logo-icon-field">
+            <label for="login_logo_icon">Icon-Klasse</label>
+            <input type="text" id="login_logo_icon" name="login_logo_icon"
+                   value="{{ login_logo_icon }}"
+                   placeholder="fas fa-play-circle"
+                   oninput="updatePreview()">
+            <span class="form-hint">z.B. <code>fas fa-play-circle</code>, <code>fas fa-film</code>, <code>fas fa-tv</code></span>
+            <div class="icon-picker" id="icon-picker">
+              {% for ic in ['fas fa-play-circle','fas fa-film','fas fa-tv','fas fa-photo-film','fas fa-compact-disc','fas fa-music','fas fa-house','fas fa-star','fas fa-bolt','fas fa-dragon'] %}
+              <button type="button" class="icon-pick-btn" onclick="pickIcon('{{ ic }}')" title="{{ ic }}">
+                <i class="{{ ic }}"></i>
+              </button>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="form-group form-group--span2" id="logo-image-field" style="display:none">
+            <label>Logo-Bild</label>
+            <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+              <input type="url" id="login_logo_image" name="login_logo_image"
+                     value="{{ login_logo_image if login_logo_image != '/login-logo' else '' }}"
+                     placeholder="https://example.com/logo.png" style="flex:1;min-width:180px"
+                     oninput="updatePreview()">
+              <label class="btn btn--outline btn--sm" for="logo-file-input" style="cursor:pointer;flex-shrink:0">
+                <i class="fas fa-upload" id="logo-upload-icon"></i>
+                <span id="logo-upload-text">Hochladen</span>
+              </label>
+              <input type="file" id="logo-file-input"
+                     accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                     style="display:none">
+            </div>
+            {% if has_login_logo %}
+            <div id="logo-upload-preview" class="bg-upload-preview" style="margin-top:.5rem">
+              <img src="/login-logo?t={{ range(1,9999)|random }}" alt="Logo-Vorschau" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,0.05);padding:4px">
+              <div>
+                <div style="font-size:.8rem;font-weight:600">Hochgeladenes Logo</div>
+                <form method="post" style="margin-top:.25rem" onsubmit="return confirm('Logo löschen?')">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                  <input type="hidden" name="action" value="delete_logo">
+                  <button type="submit" class="btn btn--ghost btn--sm" style="color:var(--color-error)">
+                    <i class="fas fa-trash"></i> Logo löschen
+                  </button>
+                </form>
+              </div>
+            </div>
+            {% else %}
+            <div id="logo-upload-preview"></div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Text -->
+        <h2 class="admin-section-title" style="margin-top:2rem">Text</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="login_title">Titel <span class="text-muted">(leer = Seitenname)</span></label>
+            <input type="text" id="login_title" name="login_title"
+                   value="{{ login_title }}" maxlength="60"
+                   placeholder="{{ site_name }}"
+                   oninput="updatePreview()">
+          </div>
+          <div class="form-group">
+            <label for="login_subtitle">Untertitel</label>
+            <input type="text" id="login_subtitle" name="login_subtitle"
+                   value="{{ login_subtitle }}" maxlength="120"
+                   placeholder="Melde dich an, um fortzufahren"
+                   oninput="updatePreview()">
+          </div>
+        </div>
+
+        <!-- Appearance -->
+        <h2 class="admin-section-title" style="margin-top:2rem">Erscheinungsbild</h2>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="login_card_style">Karten-Stil</label>
+            <select id="login_card_style" name="login_card_style" onchange="updatePreview()">
+              <option value="glass" {{ 'selected' if login_card_style == 'glass' }}>🔮 Glassmorphism (Standard)</option>
+              <option value="dark"  {{ 'selected' if login_card_style == 'dark' }}>🖤 Solid Dark</option>
+              <option value="light" {{ 'selected' if login_card_style == 'light' }}>🤍 Frosted Light</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="login_accent_color">Akzentfarbe</label>
+            <div class="color-input-wrapper">
+              <input type="color" id="login_accent_color" name="login_accent_color"
+                     value="{{ login_accent_color }}" class="color-input"
+                     oninput="document.getElementById('accent-text').value=this.value;updatePreview()">
+              <input type="text" id="accent-text" value="{{ login_accent_color }}"
+                     class="color-text" maxlength="7"
+                     oninput="document.getElementById('login_accent_color').value=this.value;updatePreview()">
+            </div>
+            <div class="accent-presets">
+              {% for color in ['#8b5cf6','#6366f1','#3b82f6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899'] %}
+              <button type="button" class="accent-preset" style="background:{{ color }}"
+                      onclick="setAccent('{{ color }}')" title="{{ color }}"></button>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Background -->
+        <h2 class="admin-section-title" style="margin-top:2rem">Login-Hintergrund</h2>
+        <p class="form-hint" style="margin-bottom:.75rem">
+          Wenn kein eigener Hintergrund gewählt ist, wird der globale Website-Hintergrund verwendet.
+        </p>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="login_bg_type">Typ</label>
+            <select id="login_bg_type" name="login_bg_type" onchange="updateLoginBgFields();updatePreview()">
+              <option value="none"     {{ 'selected' if login_bg_type == 'none' }}>Globalen Hintergrund verwenden</option>
+              <option value="color"    {{ 'selected' if login_bg_type == 'color' }}>Farbe</option>
+              <option value="gradient" {{ 'selected' if login_bg_type == 'gradient' }}>Farbverlauf (Preset)</option>
+              <option value="image"    {{ 'selected' if login_bg_type == 'image' }}>Bild (URL)</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="login-bg-color-field" style="display:none">
+            <label>Hintergrundfarbe</label>
+            <div class="color-input-wrapper">
+              <input type="color" id="login_bg_color" class="color-input"
+                     value="{{ login_bg_value if login_bg_type == 'color' else '#0a0a1a' }}"
+                     oninput="document.getElementById('login_bg_color_text').value=this.value;syncBgValue();updatePreview()">
+              <input type="text" id="login_bg_color_text" class="color-text" maxlength="7"
+                     value="{{ login_bg_value if login_bg_type == 'color' else '#0a0a1a' }}"
+                     oninput="document.getElementById('login_bg_color').value=this.value;syncBgValue();updatePreview()">
+            </div>
+          </div>
+
+          <div class="form-group" id="login-bg-gradient-field" style="display:none">
+            <label for="login_bg_gradient">Preset</label>
+            <select id="login_bg_gradient" onchange="syncBgValue();updatePreview()">
+              <option value="cosmic"   {{ 'selected' if login_bg_value == 'cosmic' }}>🌌 Cosmic</option>
+              <option value="midnight" {{ 'selected' if login_bg_value == 'midnight' }}>🌑 Midnight</option>
+              <option value="aurora"   {{ 'selected' if login_bg_value == 'aurora' }}>🌿 Aurora</option>
+              <option value="ocean"    {{ 'selected' if login_bg_value == 'ocean' }}>🌊 Ocean</option>
+              <option value="sunset"   {{ 'selected' if login_bg_value == 'sunset' }}>🌇 Sunset</option>
+              <option value="carbon"   {{ 'selected' if login_bg_value == 'carbon' }}>🖤 Carbon</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="login-bg-image-field" style="display:none">
+            <label for="login_bg_image_url">Bild-URL</label>
+            <input type="url" id="login_bg_image_url"
+                   value="{{ login_bg_value if login_bg_type == 'image' else '' }}"
+                   placeholder="https://example.com/wallpaper.jpg"
+                   oninput="syncBgValue();updatePreview()">
+          </div>
+
+          <div class="form-group" id="login-bg-overlay-field" style="display:none">
+            <label for="login_bg_overlay">
+              Overlay-Dunklung <span class="text-muted" id="login-overlay-pct">({{ (login_bg_overlay|float * 100)|int }}%)</span>
+            </label>
+            <input type="range" id="login_bg_overlay" name="login_bg_overlay"
+                   min="0" max="0.85" step="0.05"
+                   value="{{ login_bg_overlay }}"
+                   oninput="document.getElementById('login-overlay-pct').textContent='(' + Math.round(this.value*100) + '%)';updatePreview()">
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top:2rem">
+          <button type="submit" class="btn btn--primary">
+            <i class="fas fa-floppy-disk"></i> Design speichern
+          </button>
+          <a href="{{ url_for('auth.login') }}" target="_blank" class="btn btn--ghost">
+            <i class="fas fa-arrow-up-right-from-square"></i> Login-Seite öffnen
+          </a>
+        </div>
+      </form>
+    </div>
+
+    <!-- ── Right: Live Preview ─────────────────────────────────────────────── -->
+    <div class="design-preview-panel">
+      <div class="design-preview-label">
+        <i class="fas fa-eye"></i> Live-Vorschau
+      </div>
+      <div class="design-preview-viewport" id="preview-viewport">
+        <!-- Background -->
+        <div class="preview-bg-layer" id="preview-bg-layer"></div>
+        <!-- Auth replica -->
+        <div class="preview-auth-wrap">
+          <div class="preview-auth-card" id="preview-card">
+            <div class="preview-logo" id="preview-logo-wrap">
+              <i class="fas fa-play-circle" id="preview-icon"></i>
+              <img src="" alt="" id="preview-logo-img" style="display:none">
+            </div>
+            <div class="preview-title" id="preview-title">{{ login_title or site_name }}</div>
+            <div class="preview-subtitle" id="preview-subtitle">{{ login_subtitle or 'Melde dich an, um fortzufahren' }}</div>
+            <div class="preview-inputs">
+              <div class="preview-input-row">
+                <div class="preview-input-icon"><i class="fas fa-user"></i></div>
+                <div class="preview-input-bar"></div>
+              </div>
+              <div class="preview-input-row">
+                <div class="preview-input-icon"><i class="fas fa-lock"></i></div>
+                <div class="preview-input-bar"></div>
+              </div>
+            </div>
+            <div class="preview-btn" id="preview-btn">
+              <i class="fas fa-right-to-bracket"></i> Anmelden
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="design-preview-note">Vorschau — Pixel nicht 1:1 exakt</div>
+    </div>
+
+  </div><!-- /.design-workspace -->
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const SITE_NAME = {{ site_name|tojson }};
+
+const GRADIENTS = {
+  cosmic:   'linear-gradient(135deg,#12012b 0%,#0a0a2e 45%,#0d1b4b 100%)',
+  midnight: 'linear-gradient(180deg,#000008 0%,#0a0018 60%,#000008 100%)',
+  aurora:   'linear-gradient(135deg,#001a0a 0%,#0d1b4b 55%,#1a0533 100%)',
+  ocean:    'linear-gradient(135deg,#041220 0%,#0d2b4b 55%,#062040 100%)',
+  sunset:   'linear-gradient(135deg,#1a0510 0%,#2d0b1f 35%,#1a1030 70%,#0a0a2e 100%)',
+  carbon:   'linear-gradient(160deg,#0a0a0a 0%,#1a1a1a 50%,#0a0a0a 100%)',
+};
+
+// ── Field visibility ────────────────────────────────────────────────────────
+function updateLogoFields() {
+  const t = document.getElementById('login_logo_type').value;
+  document.getElementById('logo-icon-field').style.display  = t === 'icon'  ? '' : 'none';
+  document.getElementById('logo-image-field').style.display = t === 'image' ? '' : 'none';
+}
+
+function updateLoginBgFields() {
+  const t = document.getElementById('login_bg_type').value;
+  document.getElementById('login-bg-color-field').style.display    = t === 'color'    ? '' : 'none';
+  document.getElementById('login-bg-gradient-field').style.display = t === 'gradient' ? '' : 'none';
+  document.getElementById('login-bg-image-field').style.display    = t === 'image'    ? '' : 'none';
+  document.getElementById('login-bg-overlay-field').style.display  = (t === 'image')  ? '' : 'none';
+}
+
+function syncBgValue() {
+  const t = document.getElementById('login_bg_type').value;
+  let val = '';
+  if (t === 'color')    val = document.getElementById('login_bg_color').value;
+  if (t === 'gradient') val = document.getElementById('login_bg_gradient').value;
+  if (t === 'image')    val = document.getElementById('login_bg_image_url').value.trim();
+  document.getElementById('login_bg_value_hidden').value = val;
+}
+
+// Also sync bg_value before form submit
+document.getElementById('design-form').addEventListener('submit', syncBgValue);
+
+// ── Live Preview ────────────────────────────────────────────────────────────
+function updatePreview() {
+  const logoType   = document.getElementById('login_logo_type').value;
+  const logoIcon   = document.getElementById('login_logo_icon').value || 'fas fa-play-circle';
+  const logoImgUrl = document.getElementById('login_logo_image').value.trim() || '/login-logo';
+  const titleVal   = document.getElementById('login_title').value.trim() || SITE_NAME;
+  const subtitleVal= document.getElementById('login_subtitle').value;
+  const accent     = document.getElementById('login_accent_color').value;
+  const cardStyle  = document.getElementById('login_card_style').value;
+  const bgType     = document.getElementById('login_bg_type').value;
+
+  // Logo
+  const iconEl = document.getElementById('preview-icon');
+  const imgEl  = document.getElementById('preview-logo-img');
+  const wrap   = document.getElementById('preview-logo-wrap');
+  if (logoType === 'none') {
+    wrap.style.display = 'none';
+  } else {
+    wrap.style.display = '';
+    if (logoType === 'image') {
+      iconEl.style.display = 'none';
+      imgEl.src = logoImgUrl;
+      imgEl.style.display = '';
+    } else {
+      imgEl.style.display = 'none';
+      iconEl.className = logoIcon;
+      iconEl.style.display = '';
+    }
+  }
+
+  // Text
+  document.getElementById('preview-title').textContent    = titleVal;
+  document.getElementById('preview-subtitle').textContent = subtitleVal;
+
+  // Accent
+  document.getElementById('preview-btn').style.background       = accent;
+  document.getElementById('preview-logo-wrap').style.color      = accent;
+  document.getElementById('preview-icon').style.color           = accent;
+
+  // Card style
+  const card = document.getElementById('preview-card');
+  if (cardStyle === 'dark') {
+    card.style.background     = 'rgba(5,5,15,0.92)';
+    card.style.backdropFilter = 'none';
+    card.style.borderColor    = 'rgba(255,255,255,0.06)';
+  } else if (cardStyle === 'light') {
+    card.style.background     = 'rgba(255,255,255,0.13)';
+    card.style.backdropFilter = 'blur(30px)';
+    card.style.borderColor    = 'rgba(255,255,255,0.28)';
+  } else {
+    card.style.background     = 'rgba(255,255,255,0.05)';
+    card.style.backdropFilter = 'blur(20px)';
+    card.style.borderColor    = 'rgba(255,255,255,0.10)';
+  }
+
+  // Background
+  const bgLayer = document.getElementById('preview-bg-layer');
+  if (bgType === 'none') {
+    bgLayer.style.background = 'radial-gradient(ellipse at 50% 40%, rgba(139,92,246,0.15) 0%, transparent 65%)';
+  } else if (bgType === 'color') {
+    const c = document.getElementById('login_bg_color').value;
+    bgLayer.style.background = c;
+  } else if (bgType === 'gradient') {
+    const preset = document.getElementById('login_bg_gradient').value;
+    bgLayer.style.background = GRADIENTS[preset] || GRADIENTS.cosmic;
+  } else if (bgType === 'image') {
+    const url = document.getElementById('login_bg_image_url').value.trim();
+    if (url) {
+      const overlay = document.getElementById('login_bg_overlay').value;
+      bgLayer.style.background = `linear-gradient(rgba(0,0,0,${overlay}),rgba(0,0,0,${overlay})), url('${url}') center/cover no-repeat`;
+    }
+  }
+}
+
+// ── Icon picker ─────────────────────────────────────────────────────────────
+function pickIcon(cls) {
+  document.getElementById('login_logo_icon').value = cls;
+  updatePreview();
+}
+
+// ── Accent colour presets ────────────────────────────────────────────────────
+function setAccent(color) {
+  document.getElementById('login_accent_color').value = color;
+  document.getElementById('accent-text').value = color;
+  updatePreview();
+}
+
+// ── Logo upload ─────────────────────────────────────────────────────────────
+document.getElementById('logo-file-input').addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+  const icon = document.getElementById('logo-upload-icon');
+  const text = document.getElementById('logo-upload-text');
+  icon.className = 'fas fa-spinner fa-spin';
+  text.textContent = 'Hochladen…';
+
+  const fd = new FormData();
+  fd.append('logo_file', file);
+  fd.append('csrf_token', getCsrfToken());
+
+  try {
+    const res = await fetch('/admin/login-design/upload-logo', {
+      method: 'POST', body: fd,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    const json = await res.json();
+    if (json.ok) {
+      // Update logo type to image + show preview
+      document.getElementById('login_logo_type').value = 'image';
+      updateLogoFields();
+      const ts = Date.now();
+      document.getElementById('login_logo_image').value = '';
+      const previewArea = document.getElementById('logo-upload-preview');
+      previewArea.innerHTML = `
+        <div class="bg-upload-preview">
+          <img src="/login-logo?t=${ts}" alt="Logo" style="width:64px;height:64px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,0.05);padding:4px">
+          <div style="font-size:.8rem;font-weight:600">Hochgeladenes Logo</div>
+        </div>`;
+      // update preview img
+      document.getElementById('preview-logo-img').src = `/login-logo?t=${ts}`;
+      updatePreview();
+      showToast('Logo hochgeladen!', 'success');
+    } else {
+      showToast(json.error || 'Fehler beim Hochladen.', 'error');
+    }
+  } catch (e) {
+    showToast('Netzwerkfehler.', 'error');
+  } finally {
+    icon.className = 'fas fa-upload';
+    text.textContent = 'Hochladen';
+    this.value = '';
+  }
+});
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+updateLogoFields();
+updateLoginBgFields();
+updatePreview();
+</script>
+{% endblock %}

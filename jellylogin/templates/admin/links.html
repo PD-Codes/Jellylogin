@@ -1,0 +1,206 @@
+{% extends "admin/layout.html" %}
+{% block title %}Links — Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-page">
+  <div class="admin-page-header">
+    <h1 class="admin-page-title"><i class="fas fa-link"></i> Links verwalten</h1>
+    <button class="btn btn--primary" onclick="openModal('modal-add-link')">
+      <i class="fas fa-plus"></i> Link hinzufügen
+    </button>
+  </div>
+
+  <!-- Category management -->
+  <div class="admin-section">
+    <div class="section-header">
+      <h2 class="admin-section-title">Kategorien</h2>
+      <button class="btn btn--ghost btn--sm" onclick="openModal('modal-add-cat')">
+        <i class="fas fa-folder-plus"></i> Neue Kategorie
+      </button>
+    </div>
+    {% if categories %}
+    <div class="category-chips">
+      {% for cat in categories %}
+      <div class="category-chip">
+        <span>{% if cat.icon %}{{ cat.icon }} {% endif %}{{ cat.name }}</span>
+        <form method="post" action="{{ url_for('admin.delete_category', cat_id=cat.id) }}" class="inline-form"
+              onsubmit="return confirm('Kategorie löschen? Links werden entkategorisiert.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="chip-delete" title="Löschen">
+            <i class="fas fa-xmark"></i>
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">Noch keine Kategorien. Füge welche hinzu, um Links zu gruppieren.</p>
+    {% endif %}
+  </div>
+
+  <!-- Links table -->
+  <div class="admin-section">
+    <h2 class="admin-section-title">Alle Links <span class="count-badge">{{ cards|length }}</span></h2>
+    {% if cards %}
+    <div class="admin-table-wrapper">
+      <table class="admin-table" id="links-table">
+        <thead>
+          <tr>
+            <th style="width:40px" class="hide-mobile"></th>
+            <th>Name</th>
+            <th class="hide-mobile">URL</th>
+            <th class="hide-mobile">Kategorie</th>
+            <th class="hide-mobile">Stil</th>
+            <th>Sichtbar</th>
+            <th style="width:120px">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="sortable-links">
+          {% for card in cards %}
+          <tr class="sortable-row" data-id="{{ card.id }}">
+            <td class="drag-handle hide-mobile" title="Zum Sortieren ziehen">
+              <i class="fas fa-grip-vertical"></i>
+            </td>
+            <td>
+              <div class="table-name">
+                <span class="table-icon">
+                  {% if card.icon %}
+                    {% if card.icon.startswith('http') or card.icon.startswith('/') %}
+                      <img src="{{ card.icon }}" alt="" style="width:20px;height:20px;border-radius:4px;object-fit:cover">
+                    {% elif card.icon.startswith('fa') %}
+                      <i class="{{ card.icon }}"></i>
+                    {% else %}
+                      {{ card.icon }}
+                    {% endif %}
+                  {% else %}
+                    <i class="fas fa-link"></i>
+                  {% endif %}
+                </span>
+                <span>{{ card.name }}</span>
+                {% if card.description %}
+                <span class="text-muted" style="font-size:.75rem;display:block">{{ card.description }}</span>
+                {% endif %}
+              </div>
+            </td>
+            <td class="hide-mobile"><span class="table-url">{{ card.url }}</span></td>
+            <td class="hide-mobile">
+              {% if card.category %}
+                <span class="badge">{{ card.category.name }}</span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="hide-mobile"><span class="badge badge--{{ card.style }}">{{ card.style }}</span></td>
+            <td>
+              <form method="post" action="{{ url_for('admin.toggle_link', link_id=card.id) }}" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="toggle-btn {{ 'toggle-btn--on' if card.is_visible else 'toggle-btn--off' }}" title="{{ 'Ausblenden' if card.is_visible else 'Einblenden' }}">
+                  <span class="toggle-thumb"></span>
+                </button>
+              </form>
+            </td>
+            <td class="table-actions">
+              <button class="icon-btn icon-btn--edit" title="Bearbeiten"
+                onclick='openEditModal({{ card.to_dict()|tojson }})'>
+                <i class="fas fa-pen"></i>
+              </button>
+              <form method="post" action="{{ url_for('admin.delete_link', link_id=card.id) }}" class="inline-form"
+                    onsubmit='return confirm("Link \"{{ card.name|e }}\" wirklich löschen?")'>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="icon-btn icon-btn--delete" title="Löschen">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state empty-state--sm">
+      <div class="empty-state-icon"><i class="fas fa-link"></i></div>
+      <p>Noch keine Links vorhanden.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal: Add Link -->
+<div class="modal-overlay" id="modal-add-link" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title"><i class="fas fa-plus"></i> Link hinzufügen</h2>
+      <button class="modal-close" onclick="closeModal('modal-add-link')"><i class="fas fa-xmark"></i></button>
+    </div>
+    <form method="post" action="{{ url_for('admin.create_link') }}" class="modal-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% include 'admin/_link_form.html' %}
+      <div class="modal-footer">
+        <button type="button" class="btn btn--ghost" onclick="closeModal('modal-add-link')">Abbrechen</button>
+        <button type="submit" class="btn btn--primary">
+          <i class="fas fa-plus"></i> Erstellen
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Edit Link -->
+<div class="modal-overlay" id="modal-edit-link" hidden>
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title"><i class="fas fa-pen"></i> Link bearbeiten</h2>
+      <button class="modal-close" onclick="closeModal('modal-edit-link')"><i class="fas fa-xmark"></i></button>
+    </div>
+    <form method="post" id="edit-link-form" class="modal-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% include 'admin/_link_form.html' %}
+      <div class="form-check" style="margin-top:.5rem">
+        <input type="checkbox" id="edit-is_visible" name="is_visible" checked>
+        <label for="edit-is_visible">Sichtbar</label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn--ghost" onclick="closeModal('modal-edit-link')">Abbrechen</button>
+        <button type="submit" class="btn btn--primary">
+          <i class="fas fa-floppy-disk"></i> Speichern
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Add Category -->
+<div class="modal-overlay" id="modal-add-cat" hidden>
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <h2 class="modal-title"><i class="fas fa-folder-plus"></i> Kategorie hinzufügen</h2>
+      <button class="modal-close" onclick="closeModal('modal-add-cat')"><i class="fas fa-xmark"></i></button>
+    </div>
+    <form method="post" action="{{ url_for('admin.create_category') }}" class="modal-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-group">
+        <label for="cat-name">Name</label>
+        <input type="text" id="cat-name" name="name" required placeholder="z.B. Medien">
+      </div>
+      <div class="form-group">
+        <label for="cat-icon">Icon <span class="text-muted">(Emoji, optional)</span></label>
+        <input type="text" id="cat-icon" name="icon" placeholder="🎬">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn--ghost" onclick="closeModal('modal-add-cat')">Abbrechen</button>
+        <button type="submit" class="btn btn--primary">
+          <i class="fas fa-plus"></i> Erstellen
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% block scripts %}
+<script>
+  const CSRF_TOKEN = {{ csrf_token|tojson }};
+  initLinkAdmin();
+</script>
+{% endblock %}
+{% endblock %}

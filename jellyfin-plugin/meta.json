@@ -1,0 +1,18 @@
+{
+  "category": "Authentication",
+  "guid": "c3a7f210-4d8e-4b5a-9f62-1a2b3c4d5e6f",
+  "name": "DKS JellyLogin SSO",
+  "description": "Single Sign-On via DKS JellyLogin — authenticate Jellyfin users with their JellyLogin credentials.",
+  "overview": "Allows Jellyfin to delegate authentication to a running DKS JellyLogin instance.",
+  "owner": "DomeKologe",
+  "versions": [
+    {
+      "version": "1.0.0.0",
+      "changelog": "Initial release — basic username/password SSO via JellyLogin plugin API.",
+      "targetAbi": "10.9.0.0",
+      "sourceUrl": "",
+      "checksum": "",
+      "timestamp": "2026-06-05T00:00:00Z"
+    }
+  ]
+}

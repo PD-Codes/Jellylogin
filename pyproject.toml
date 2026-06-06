@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling>=1.21.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jellylogin"
+version = "1.0.0"
+description = "JellyLogin — Central media service hub with Jellyfin authentication"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "GPL-3.0-or-later"
+authors = [
+    { name = "Domenick Waldvogel", email = "domenick.waldvogel@domekologe.eu" }
+]
+keywords = ["jellyfin", "media", "dashboard", "homelab", "self-hosted"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Framework :: Flask",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
+    "Environment :: Web Environment",
+]
+dependencies = [
+    "Flask>=3.0.0",
+    "Flask-SQLAlchemy>=3.1.0",
+    "requests>=2.31.0",
+    "waitress>=2.1.0",
+    "Werkzeug>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/domekologe/jellylogin"
+"Bug Tracker" = "https://github.com/domekologe/jellylogin/issues"
+
+[project.scripts]
+jellylogin = "jellylogin.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["jellylogin"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/jellylogin",
+    "/README.md",
+    "/LICENSE",
+    "/MANIFEST.in",
+    "/pyproject.toml",
+]

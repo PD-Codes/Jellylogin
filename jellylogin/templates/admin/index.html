@@ -1,0 +1,117 @@
+{% extends "admin/layout.html" %}
+{% block title %}Admin — {{ site_name }}{% endblock %}
+
+{% block admin_content %}
+<div class="admin-page">
+  <div class="admin-page-header">
+    <h1 class="admin-page-title">
+      <i class="fas fa-chart-pie"></i>
+      Übersicht
+    </h1>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon" style="--stat-color: #8b5cf6">
+        <i class="fas fa-link"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value">{{ total_links }}</div>
+        <div class="stat-label">Links</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="--stat-color: #3b82f6">
+        <i class="fas fa-users"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value">{{ total_users }}</div>
+        <div class="stat-label">Benutzer</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon" style="--stat-color: #10b981">
+        <i class="fas fa-folder"></i>
+      </div>
+      <div class="stat-body">
+        <div class="stat-value">{{ total_categories }}</div>
+        <div class="stat-label">Kategorien</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="admin-section">
+    <h2 class="admin-section-title">Schnellzugriff</h2>
+    <div class="quick-actions">
+      <a href="{{ url_for('admin.links') }}" class="quick-action">
+        <div class="quick-action-icon" style="--qa-color: #8b5cf6">
+          <i class="fas fa-plus"></i>
+        </div>
+        <span>Link hinzufügen</span>
+      </a>
+      <a href="{{ url_for('admin.users') }}" class="quick-action">
+        <div class="quick-action-icon" style="--qa-color: #3b82f6">
+          <i class="fas fa-user-plus"></i>
+        </div>
+        <span>Benutzer verwalten</span>
+      </a>
+      <a href="{{ url_for('admin.jellyfin') }}" class="quick-action">
+        <div class="quick-action-icon" style="--qa-color: #f59e0b">
+          <i class="fas fa-server"></i>
+        </div>
+        <span>Jellyfin konfigurieren</span>
+      </a>
+      <a href="{{ url_for('admin.settings') }}" class="quick-action">
+        <div class="quick-action-icon" style="--qa-color: #10b981">
+          <i class="fas fa-gear"></i>
+        </div>
+        <span>Einstellungen</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Recent Links -->
+  {% if recent_links %}
+  <div class="admin-section">
+    <h2 class="admin-section-title">Zuletzt hinzugefügt</h2>
+    <div class="admin-table-wrapper">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>URL</th>
+            <th>Stil</th>
+            <th>Erstellt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for link in recent_links %}
+          <tr>
+            <td>
+              <div class="table-name">
+                <span class="table-icon">
+                  {% if link.icon and not link.icon.startswith('http') and not link.icon.startswith('fa') %}
+                    {{ link.icon }}
+                  {% elif link.icon and link.icon.startswith('fa') %}
+                    <i class="{{ link.icon }}"></i>
+                  {% else %}
+                    <i class="fas fa-link"></i>
+                  {% endif %}
+                </span>
+                {{ link.name }}
+              </div>
+            </td>
+            <td><span class="table-url">{{ link.url }}</span></td>
+            <td><span class="badge">{{ link.style }}</span></td>
+            <td class="table-date">{{ link.created_at.strftime('%d.%m.%Y') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

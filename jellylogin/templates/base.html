@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}DKS Media Hub{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  {% if has_favicon %}
+  <link rel="icon" href="/favicon.ico?v={{ range(1,9999)|random }}">
+  {% else %}
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon-default.svg') }}" type="image/svg+xml">
+  {% endif %}
+  {% if site_bg_type != 'none' %}
+  <style>
+    body { background: transparent; }
+    .site-bg { display: block; }
+    {% if site_bg_type == 'image' and site_bg_value %}
+    .site-bg {
+      background: url('{{ site_bg_value }}') center / cover fixed no-repeat;
+    }
+    .site-bg::after { background: rgba(0,0,0,{{ site_bg_overlay }}); }
+    {% elif site_bg_type == 'color' and site_bg_value %}
+    .site-bg { background: {{ site_bg_value }}; }
+    {% elif site_bg_type == 'gradient' %}
+    .site-bg { background: {{ {
+      'cosmic':   'linear-gradient(135deg,#12012b 0%,#0a0a2e 45%,#0d1b4b 100%)',
+      'midnight': 'linear-gradient(180deg,#000008 0%,#0a0018 60%,#000008 100%)',
+      'aurora':   'linear-gradient(135deg,#001a0a 0%,#0d1b4b 55%,#1a0533 100%)',
+      'ocean':    'linear-gradient(135deg,#041220 0%,#0d2b4b 55%,#062040 100%)',
+      'sunset':   'linear-gradient(135deg,#1a0510 0%,#2d0b1f 35%,#1a1030 70%,#0a0a2e 100%)',
+      'carbon':   'linear-gradient(160deg,#0a0a0a 0%,#1a1a1a 50%,#0a0a0a 100%)',
+    }.get(site_bg_value, 'none') }}; }
+    {% endif %}
+  </style>
+  {% endif %}
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <!-- Fixed background layer (shown only when a bg is configured) -->
+  <div class="site-bg" aria-hidden="true"></div>
+
+  {% block body %}{% endblock %}
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

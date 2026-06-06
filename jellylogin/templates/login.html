@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Anmelden — {{ login_title or site_name }}{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block head %}
+{# ── Accent colour override ── #}
+{% if login_accent_color and login_accent_color != '#8b5cf6' %}
+<style>
+  :root {
+    --color-accent:      {{ login_accent_color }};
+    --color-accent-dark: {{ login_accent_color }};
+    --color-border-focus:{{ login_accent_color }}99;
+    --color-accent-glow: {{ login_accent_color }}40;
+  }
+</style>
+{% endif %}
+{# ── Login-specific background (overrides site-bg when configured) ── #}
+{% if login_bg_type != 'none' %}
+<style>
+  .site-bg { display: none !important; }
+  .auth-bg {
+    display: block;
+    {% if login_bg_type == 'color' and login_bg_value %}
+    background: {{ login_bg_value }};
+    {% elif login_bg_type == 'gradient' %}
+    background: {{ {
+      'cosmic':   'linear-gradient(135deg,#12012b 0%,#0a0a2e 45%,#0d1b4b 100%)',
+      'midnight': 'linear-gradient(180deg,#000008 0%,#0a0018 60%,#000008 100%)',
+      'aurora':   'linear-gradient(135deg,#001a0a 0%,#0d1b4b 55%,#1a0533 100%)',
+      'ocean':    'linear-gradient(135deg,#041220 0%,#0d2b4b 55%,#062040 100%)',
+      'sunset':   'linear-gradient(135deg,#1a0510 0%,#2d0b1f 35%,#1a1030 70%,#0a0a2e 100%)',
+      'carbon':   'linear-gradient(160deg,#0a0a0a 0%,#1a1a1a 50%,#0a0a0a 100%)',
+    }.get(login_bg_value, 'linear-gradient(135deg,#12012b 0%,#0a0a2e 100%)') }};
+    {% elif login_bg_type == 'image' and login_bg_value %}
+    background: url('{{ login_bg_value }}') center / cover no-repeat fixed;
+    {% endif %}
+  }
+  {% if login_bg_type == 'image' %}
+  .auth-bg::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,{{ login_bg_overlay }});
+    z-index: 0;
+  }
+  {% endif %}
+</style>
+{% endif %}
+{% endblock %}
+
+{% block body %}
+<div class="auth-bg"></div>
+<div class="auth-container">
+  <div class="auth-card {% if login_card_style == 'dark' %}auth-card--dark{% elif login_card_style == 'light' %}auth-card--light{% endif %}">
+
+    {# ── Logo ── #}
+    {% if login_logo_type != 'none' %}
+    <div class="auth-logo">
+      {% if login_logo_type == 'image' and login_logo_image %}
+        <img src="{{ login_logo_image }}" alt="Logo" class="auth-logo-img">
+      {% else %}
+        <i class="{{ login_logo_icon or 'fas fa-play-circle' }}"></i>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <h1 class="auth-title">{{ login_title or site_name }}</h1>
+    <p class="auth-subtitle">{{ login_subtitle or 'Melde dich an, um fortzufahren' }}</p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div class="alert alert--{{ category }}">
+        <i class="fas fa-{{ 'circle-check' if category == 'success' else 'circle-exclamation' }}"></i>
+        {{ message }}
+      </div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="post" class="auth-form" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <div class="form-group">
+        <label for="username">Benutzername</label>
+        <div class="input-wrapper">
+          <i class="fas fa-user input-icon"></i>
+          <input type="text" id="username" name="username"
+                 autocomplete="username" required autofocus
+                 placeholder="Benutzername">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Passwort</label>
+        <div class="input-wrapper">
+          <i class="fas fa-lock input-icon"></i>
+          <input type="password" id="password" name="password"
+                 autocomplete="current-password" required
+                 placeholder="Passwort">
+          <button type="button" class="input-toggle-pw" tabindex="-1">
+            <i class="fas fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="form-check">
+        <input type="checkbox" id="remember" name="remember">
+        <label for="remember">Angemeldet bleiben</label>
+      </div>
+
+      <button type="submit" class="btn btn--primary btn--full">
+        <i class="fas fa-right-to-bracket"></i>
+        Anmelden
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,172 @@
+{% extends "admin/layout.html" %}
+{% block title %}Benutzer — Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-page">
+  <div class="admin-page-header">
+    <h1 class="admin-page-title"><i class="fas fa-users"></i> Benutzerverwaltung</h1>
+    <button class="btn btn--primary" onclick="openModal('modal-add-user')">
+      <i class="fas fa-user-plus"></i> Benutzer erstellen
+    </button>
+  </div>
+
+  <div class="admin-section">
+    <div class="admin-table-wrapper">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Benutzer</th>
+            <th>Rolle</th>
+            <th>Typ</th>
+            <th>Letzter Login</th>
+            <th>Status</th>
+            <th>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+          <tr>
+            <td>
+              <div class="user-row">
+                <div class="user-avatar user-avatar--sm">{{ user.username[0]|upper }}</div>
+                <div>
+                  <div class="user-row-name">
+                    {{ user.username }}
+                    {% if user.id == current_user_id %}
+                    <span class="badge badge--you">Du</span>
+                    {% endif %}
+                  </div>
+                  {% if user.jellyfin_user_id %}
+                  <div class="text-muted" style="font-size:.72rem">JF: {{ user.jellyfin_user_id[:8] }}…</div>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+            <td>
+              {% if user.id != current_user_id %}
+              <form method="post" action="{{ url_for('admin.change_role', user_id=user.id) }}" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <select name="role" onchange="this.form.submit()" class="inline-select">
+                  <option value="user" {{ 'selected' if user.role == 'user' }}>Benutzer</option>
+                  <option value="admin" {{ 'selected' if user.role == 'admin' }}>Admin</option>
+                </select>
+              </form>
+              {% else %}
+              <span class="badge badge--admin">Admin</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge badge--{{ user.auth_type }}">
+                {% if user.auth_type == 'jellyfin' %}<i class="fas fa-server"></i>{% else %}<i class="fas fa-key"></i>{% endif %}
+                {{ 'Jellyfin' if user.auth_type == 'jellyfin' else 'Lokal' }}
+              </span>
+            </td>
+            <td class="text-muted">
+              {{ user.last_login.strftime('%d.%m.%Y %H:%M') if user.last_login else '—' }}
+            </td>
+            <td>
+              {% if user.id != current_user_id %}
+              <form method="post" action="{{ url_for('admin.toggle_user', user_id=user.id) }}" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="toggle-btn {{ 'toggle-btn--on' if user.is_active else 'toggle-btn--off' }}"
+                        title="{{ 'Deaktivieren' if user.is_active else 'Aktivieren' }}">
+                  <span class="toggle-thumb"></span>
+                </button>
+              </form>
+              {% else %}
+              <span class="badge" style="color:var(--color-success)">Aktiv</span>
+              {% endif %}
+            </td>
+            <td class="table-actions">
+              {% if user.auth_type == 'local' %}
+              <button class="icon-btn icon-btn--edit" title="Passwort ändern"
+                onclick="openPwModal({{ user.id }}, {{ user.username|tojson }})">
+                <i class="fas fa-key"></i>
+              </button>
+              {% endif %}
+              {% if user.id != current_user_id %}
+              <form method="post" action="{{ url_for('admin.delete_user', user_id=user.id) }}" class="inline-form"
+                    onsubmit="return confirm('Benutzer \'{{ user.username }}\' wirklich löschen?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="icon-btn icon-btn--delete" title="Löschen">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Create User -->
+<div class="modal-overlay" id="modal-add-user" hidden>
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <h2 class="modal-title"><i class="fas fa-user-plus"></i> Benutzer erstellen</h2>
+      <button class="modal-close" onclick="closeModal('modal-add-user')"><i class="fas fa-xmark"></i></button>
+    </div>
+    <form method="post" action="{{ url_for('admin.create_user') }}" class="modal-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-group">
+        <label for="new-username">Benutzername</label>
+        <input type="text" id="new-username" name="username" required minlength="3" placeholder="Mindestens 3 Zeichen">
+      </div>
+      <div class="form-group">
+        <label for="new-password">Passwort</label>
+        <input type="password" id="new-password" name="password" required minlength="8" placeholder="Mindestens 8 Zeichen">
+      </div>
+      <div class="form-group">
+        <label for="new-role">Rolle</label>
+        <select id="new-role" name="role">
+          <option value="user">Benutzer</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn--ghost" onclick="closeModal('modal-add-user')">Abbrechen</button>
+        <button type="submit" class="btn btn--primary"><i class="fas fa-plus"></i> Erstellen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Change Password -->
+<div class="modal-overlay" id="modal-change-pw" hidden>
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <h2 class="modal-title"><i class="fas fa-key"></i> Passwort ändern</h2>
+      <button class="modal-close" onclick="closeModal('modal-change-pw')"><i class="fas fa-xmark"></i></button>
+    </div>
+    <form method="post" id="pw-change-form" class="modal-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <p class="text-muted" style="margin-bottom:1rem">Passwort für <strong id="pw-modal-username"></strong> ändern.</p>
+      <div class="form-group">
+        <label for="new-pw">Neues Passwort</label>
+        <div class="input-wrapper">
+          <i class="fas fa-lock input-icon"></i>
+          <input type="password" id="new-pw" name="password" required minlength="8" placeholder="Mindestens 8 Zeichen">
+          <button type="button" class="input-toggle-pw" tabindex="-1"><i class="fas fa-eye"></i></button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn--ghost" onclick="closeModal('modal-change-pw')">Abbrechen</button>
+        <button type="submit" class="btn btn--primary"><i class="fas fa-floppy-disk"></i> Speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% block scripts %}
+<script>
+function openPwModal(userId, username) {
+  document.getElementById('pw-modal-username').textContent = username;
+  document.getElementById('pw-change-form').action = '/admin/users/' + userId + '/password';
+  openModal('modal-change-pw');
+}
+</script>
+{% endblock %}
+{% endblock %}

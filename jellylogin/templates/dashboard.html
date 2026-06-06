@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}{{ site_name }}{% endblock %}
+
+{% macro _render_card(card, show_status) %}
+<a href="{{ card.url }}"
+   class="link-card link-card--{{ card.style }}"
+   {% if card.open_in_new_tab %}target="_blank" rel="noopener noreferrer"{% endif %}
+   data-id="{{ card.id }}"
+   data-name="{{ card.name|lower }}"
+   data-desc="{{ (card.description or '')|lower }}"
+   {% if card.bg_image %}
+     style="--card-bg-image: url('{{ card.bg_image }}');"
+   {% elif card.style == 'solid' %}
+     style="--card-bg-color: {{ card.bg_color }};"
+   {% endif %}
+>
+  <div class="link-card__icon">
+    {% if card.icon %}
+      {% if card.icon.startswith('http') or card.icon.startswith('/') %}
+        <img src="{{ card.icon }}" alt="{{ card.name }}" loading="lazy">
+      {% elif card.icon.startswith('fa') %}
+        <i class="{{ card.icon }}"></i>
+      {% else %}
+        <span class="link-card__emoji">{{ card.icon }}</span>
+      {% endif %}
+    {% else %}
+      <i class="fas fa-link"></i>
+    {% endif %}
+  </div>
+  <div class="link-card__content">
+    <span class="link-card__name">{{ card.name }}</span>
+    {% if card.description %}
+    <span class="link-card__desc">{{ card.description }}</span>
+    {% endif %}
+  </div>
+  {% if show_status and card.check_status %}
+  <div class="link-card__status">
+    <span class="status-dot status-dot--loading" id="status-{{ card.id }}" title="Prüfe…"></span>
+  </div>
+  {% endif %}
+  <div class="link-card__arrow">
+    <i class="fas fa-arrow-right"></i>
+  </div>
+</a>
+{% endmacro %}
+
+{% block body %}
+<!-- Navbar -->
+<nav class="navbar">
+  <div class="navbar-brand">
+    <i class="fas fa-play-circle navbar-logo"></i>
+    <span class="navbar-title">{{ site_name }}</span>
+  </div>
+  <div class="navbar-center">
+    <div class="search-box">
+      <i class="fas fa-magnifying-glass search-icon"></i>
+      <input type="text" id="search-input" placeholder="Suchen… (Taste /)" autocomplete="off">
+      <kbd class="search-kbd">/</kbd>
+    </div>
+  </div>
+  <div class="navbar-end">
+    <button class="icon-btn navbar-search-toggle" id="mobile-search-btn"
+            aria-label="Suche" onclick="toggleMobileSearch()">
+      <i class="fas fa-magnifying-glass"></i>
+    </button>
+    {% if role == 'admin' %}
+    <a href="{{ url_for('admin.index') }}" class="btn btn--ghost btn--sm">
+      <i class="fas fa-sliders"></i>
+      Admin
+    </a>
+    {% endif %}
+    <div class="user-menu">
+      <button class="user-btn" id="user-menu-btn">
+        <div class="user-avatar">{{ username[0]|upper }}</div>
+        <span class="user-name">{{ username }}</span>
+        <i class="fas fa-chevron-down user-chevron"></i>
+      </button>
+      <div class="user-dropdown" id="user-dropdown">
+        <div class="user-dropdown-header">
+          <div class="user-avatar user-avatar--lg">{{ username[0]|upper }}</div>
+          <div>
+            <div class="user-dropdown-name">{{ username }}</div>
+            <div class="user-dropdown-role">{{ 'Administrator' if role == 'admin' else 'Benutzer' }}</div>
+          </div>
+        </div>
+        <div class="user-dropdown-divider"></div>
+        <a href="{{ url_for('auth.logout') }}" class="user-dropdown-item user-dropdown-item--danger">
+          <i class="fas fa-right-from-bracket"></i>
+          Abmelden
+        </a>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- Main -->
+<main class="main">
+
+  <!-- Announcement -->
+  {% if announcement %}
+  <div class="announcement announcement--{{ announcement_type }}">
+    <i class="fas fa-{{ 'circle-info' if announcement_type == 'info' else ('triangle-exclamation' if announcement_type == 'warning' else 'circle-check') }}"></i>
+    {{ announcement }}
+    <button class="announcement-close" onclick="this.parentElement.remove()">
+      <i class="fas fa-xmark"></i>
+    </button>
+  </div>
+  {% endif %}
+
+  <!-- Header -->
+  <div class="page-header">
+    {% if site_description %}
+    <p class="page-subtitle">{{ site_description }}</p>
+    {% endif %}
+  </div>
+
+  <!-- Category Tabs -->
+  {% set has_categories = categories|length > 0 %}
+  {% if has_categories %}
+  <div class="category-tabs" id="category-tabs">
+    <button class="category-tab active" data-cat="all">
+      <i class="fas fa-th-large"></i>
+      Alle
+    </button>
+    {% for cat in categories %}
+    {% if cat.links|selectattr('is_visible')|list|length > 0 %}
+    <button class="category-tab" data-cat="{{ cat.id }}">
+      {% if cat.icon %}{{ cat.icon }}{% else %}<i class="fas fa-folder"></i>{% endif %}
+      {{ cat.name }}
+    </button>
+    {% endif %}
+    {% endfor %}
+    {% if uncategorized|length > 0 %}
+    <button class="category-tab" data-cat="uncategorized">
+      <i class="fas fa-layer-group"></i>
+      Sonstige
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Links Grid -->
+  <div class="links-grid" id="links-grid">
+
+    <!-- Categorized -->
+    {% for cat in categories %}
+    {% set visible_links = cat.links|selectattr('is_visible')|list %}
+    {% if visible_links %}
+    <div class="links-section" data-cat="{{ cat.id }}">
+      {% if has_categories %}
+      <h2 class="links-section-title">
+        {% if cat.icon %}{{ cat.icon }}{% else %}<i class="fas fa-folder"></i>{% endif %}
+        {{ cat.name }}
+      </h2>
+      {% endif %}
+      <div class="links-row">
+        {% for card in visible_links %}
+        {{ _render_card(card, show_status) }}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+
+    <!-- Uncategorized -->
+    {% if uncategorized %}
+    <div class="links-section" data-cat="uncategorized">
+      {% if has_categories %}
+      <h2 class="links-section-title">
+        <i class="fas fa-layer-group"></i>
+        Sonstige
+      </h2>
+      {% endif %}
+      <div class="links-row">
+        {% for card in uncategorized %}
+        {{ _render_card(card, show_status) }}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Empty state -->
+    {% if not categories and not uncategorized %}
+    <div class="empty-state">
+      <div class="empty-state-icon"><i class="fas fa-rocket"></i></div>
+      <h3>Noch keine Links</h3>
+      <p>Füge deinen ersten Medienlink hinzu.</p>
+      {% if role == 'admin' %}
+      <a href="{{ url_for('admin.links') }}" class="btn btn--primary">
+        <i class="fas fa-plus"></i>
+        Link hinzufügen
+      </a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Search results overlay -->
+    <div class="search-results" id="search-results" hidden></div>
+  </div>
+
+</main>
+
+{% block scripts %}
+<script>
+  const SHOW_STATUS = {{ 'true' if show_status else 'false' }};
+</script>
+{% endblock %}
+{% endblock %}

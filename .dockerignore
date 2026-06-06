@@ -1,9 +1,17 @@
 .venv/
+.git/
+.gitignore
 __pycache__/
 *.pyc
+*.pyo
 data/
 *.db
 .secret_key
 dist/
 build/
 *.egg-info/
+jellyfin-plugin/
+tests/
+*.md
+.env
+.env.*

@@ -1,0 +1,350 @@
+{% extends "admin/layout.html" %}
+{% block title %}Einstellungen — Admin{% endblock %}
+
+{% block admin_content %}
+<div class="admin-page">
+  <div class="admin-page-header">
+    <h1 class="admin-page-title"><i class="fas fa-gear"></i> Allgemeine Einstellungen</h1>
+  </div>
+
+  <form method="post" class="admin-section">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <h2 class="admin-section-title">Website</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="site_name">Seitenname</label>
+        <input type="text" id="site_name" name="site_name" value="{{ site_name }}" required maxlength="60">
+        <span class="form-hint">Wird in der Navbar und im Browsertab angezeigt</span>
+      </div>
+
+      <div class="form-group">
+        <label for="site_description">Beschreibung <span class="text-muted">(optional)</span></label>
+        <input type="text" id="site_description" name="site_description" value="{{ site_description }}" maxlength="120">
+        <span class="form-hint">Kurzer Untertitel auf dem Dashboard</span>
+      </div>
+    </div>
+
+    <h2 class="admin-section-title" style="margin-top:2rem">Status-Prüfung</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <div class="form-check form-check--big">
+          <input type="checkbox" id="show_status" name="show_status" {{ 'checked' if show_status }}>
+          <label for="show_status">
+            <span class="check-title">Status-Indikatoren anzeigen</span>
+            <span class="check-desc">Zeigt Online/Offline-Punkte auf den Link-Karten</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="status_cache_seconds">Cache-Dauer (Sekunden)</label>
+        <input type="number" id="status_cache_seconds" name="status_cache_seconds"
+               value="{{ status_cache_seconds }}" min="10" max="3600">
+        <span class="form-hint">Wie lange Status-Ergebnisse zwischengespeichert werden</span>
+      </div>
+    </div>
+
+    <h2 class="admin-section-title" style="margin-top:2rem">Hintergrund</h2>
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="bg_type">Hintergrund-Typ</label>
+        <select id="bg_type" name="bg_type" onchange="updateBgFields()">
+          <option value="none"     {{ 'selected' if bg_type == 'none' }}>Keiner (Standard)</option>
+          <option value="color"    {{ 'selected' if bg_type == 'color' }}>Farbe</option>
+          <option value="image"    {{ 'selected' if bg_type == 'image' }}>Bild (URL)</option>
+          <option value="gradient" {{ 'selected' if bg_type == 'gradient' }}>Farbverlauf (Preset)</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="bg-color-field" style="display:none">
+        <label for="bg_value_color">Hintergrundfarbe</label>
+        <div class="color-input-wrapper">
+          <input type="color" id="bg_value_color" value="{{ bg_value if bg_type == 'color' else '#0a0a1a' }}"
+                 oninput="document.getElementById('bg_value_color_text').value=this.value"
+                 class="color-input">
+          <input type="text"  id="bg_value_color_text" value="{{ bg_value if bg_type == 'color' else '#0a0a1a' }}"
+                 class="color-text" maxlength="7"
+                 oninput="document.getElementById('bg_value_color').value=this.value">
+        </div>
+      </div>
+
+      <div class="form-group form-group--span2" id="bg-image-field" style="display:none">
+        <label>Hintergrundbild</label>
+
+        <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
+          <input type="url" id="bg_value_image"
+                 value="{{ bg_value if (bg_type == 'image' and bg_value != '/bg-image') else '' }}"
+                 placeholder="https://example.com/wallpaper.jpg" style="flex:1">
+          <span class="text-muted" style="white-space:nowrap;font-size:.8rem">oder</span>
+          <label class="btn btn--outline btn--sm" for="bg-file-input"
+                 style="cursor:pointer;white-space:nowrap;flex-shrink:0" id="upload-btn-label">
+            <i class="fas fa-upload" id="upload-btn-icon"></i>
+            <span id="upload-btn-text">Datei hochladen</span>
+          </label>
+          <input type="file" id="bg-file-input"
+                 accept="image/jpeg,image/png,image/webp,image/gif"
+                 style="display:none">
+        </div>
+
+        <span class="form-hint">Bild-URL eingeben <em>oder</em> Datei hochladen (JPG, PNG, WebP, GIF — max. 10 MB)</span>
+
+        <div id="bg-upload-preview-wrap">
+          {% if has_bg_upload %}
+          <div class="bg-upload-preview">
+            <img src="/bg-image?t={{ range(1,9999)|random }}" alt="Vorschau">
+            <div>
+              <div style="font-size:.8rem;font-weight:600">Hochgeladenes Bild</div>
+              <div class="form-hint">Wird als Hintergrund verwendet wenn kein URL eingetragen ist</div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="form-group" id="bg-gradient-field" style="display:none">
+        <label for="bg_value_gradient">Preset</label>
+        <select id="bg_value_gradient">
+          <option value="cosmic"   {{ 'selected' if bg_value == 'cosmic' }}>🌌 Cosmic (Lila → Dunkelblau)</option>
+          <option value="midnight" {{ 'selected' if bg_value == 'midnight' }}>🌑 Midnight (Tiefschwarz)</option>
+          <option value="aurora"   {{ 'selected' if bg_value == 'aurora' }}>🌿 Aurora (Grün → Lila)</option>
+          <option value="ocean"    {{ 'selected' if bg_value == 'ocean' }}>🌊 Ocean (Dunkelblau)</option>
+          <option value="sunset"   {{ 'selected' if bg_value == 'sunset' }}>🌇 Sunset (Dunkelrot → Lila)</option>
+          <option value="carbon"   {{ 'selected' if bg_value == 'carbon' }}>🖤 Carbon (Dunkelgrau)</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="bg-overlay-field" style="display:none">
+        <label for="bg_overlay">Overlay-Dunklung <span class="text-muted" id="overlay-label">({{ (bg_overlay|float * 100)|int }}%)</span></label>
+        <input type="range" id="bg_overlay" name="bg_overlay"
+               min="0" max="0.85" step="0.05"
+               value="{{ bg_overlay }}"
+               oninput="document.getElementById('overlay-label').textContent='(' + Math.round(this.value*100) + '%)'">
+        <span class="form-hint">Wie stark das Bild verdunkelt wird (für bessere Lesbarkeit)</span>
+      </div>
+    </div>
+    <!-- Hidden field carries the actual bg_value -->
+    <input type="hidden" id="bg_value" name="bg_value" value="{{ bg_value }}">
+
+    <h2 class="admin-section-title" style="margin-top:2rem">Ankündigung</h2>
+    <div class="form-grid">
+      <div class="form-group form-group--span2">
+        <label for="announcement">Nachricht <span class="text-muted">(leer = deaktiviert)</span></label>
+        <input type="text" id="announcement" name="announcement" value="{{ announcement }}" maxlength="300"
+               placeholder="Nachricht für alle Benutzer auf dem Dashboard">
+      </div>
+
+      <div class="form-group">
+        <label for="announcement_type">Typ</label>
+        <select id="announcement_type" name="announcement_type">
+          <option value="info" {{ 'selected' if announcement_type == 'info' }}>ℹ️ Info</option>
+          <option value="warning" {{ 'selected' if announcement_type == 'warning' }}>⚠️ Warnung</option>
+          <option value="success" {{ 'selected' if announcement_type == 'success' }}>✅ Erfolg</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn--primary">
+        <i class="fas fa-floppy-disk"></i> Einstellungen speichern
+      </button>
+    </div>
+  </form>
+
+  <!-- Favicon -->
+  <div class="admin-section">
+    <h2 class="admin-section-title">Favicon</h2>
+    <p class="text-sec" style="font-size:.875rem;margin-bottom:1rem">
+      Das Icon, das im Browser-Tab und als App-Icon angezeigt wird. Empfohlen: ICO, PNG oder SVG (32×32 px).
+    </p>
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      {% if has_favicon %}
+      <div class="favicon-preview">
+        <img src="/favicon.ico?t={{ range(1,9999)|random }}" alt="Favicon" id="favicon-preview-img">
+        <span class="form-hint">Aktuelles Favicon</span>
+      </div>
+      {% else %}
+      <div class="favicon-preview favicon-preview--default">
+        <i class="fas fa-image" style="font-size:1.5rem;color:var(--color-text-muted)"></i>
+        <span class="form-hint">Kein eigenes Favicon</span>
+      </div>
+      {% endif %}
+
+      <label class="btn btn--outline btn--sm" for="favicon-file-input" style="cursor:pointer">
+        <i class="fas fa-upload" id="favicon-icon"></i>
+        <span id="favicon-text">{% if has_favicon %}Ersetzen{% else %}Hochladen{% endif %}</span>
+      </label>
+      <input type="file" id="favicon-file-input"
+             accept=".ico,.png,.svg,.jpg,.jpeg"
+             style="display:none">
+      <span class="form-hint">ICO, PNG, SVG, JPG — max. 2 MB</span>
+    </div>
+    <div id="favicon-status" style="margin-top:.5rem"></div>
+  </div>
+
+  <!-- Plugin Secret -->
+  <div class="admin-section">
+    <h2 class="admin-section-title">Jellyfin SSO Plugin</h2>
+    <div class="info-card info-card--blue" style="margin-bottom:1rem">
+      <i class="fas fa-circle-info"></i>
+      <div>
+        Trage dieses Secret im <strong>Jellyfin Admin → Plugins → DKS JellyLogin SSO</strong> ein.
+        Das Plugin nutzt es, um sich sicher bei JellyLogin zu authentifizieren.
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Plugin-Secret</label>
+      <div class="secret-display">
+        <input type="password" id="plugin-secret-field" value="{{ plugin_secret }}" readonly
+               style="font-family:monospace;flex:1">
+        <button type="button" class="btn btn--ghost btn--sm" id="toggle-secret-btn"
+                onclick="toggleSecret()">
+          <i class="fas fa-eye" id="toggle-secret-icon"></i>
+        </button>
+        <button type="button" class="btn btn--ghost btn--sm"
+                onclick="navigator.clipboard.writeText('{{ plugin_secret }}').then(()=>showToast('Secret kopiert!','success'))">
+          <i class="fas fa-copy"></i>
+        </button>
+      </div>
+    </div>
+    <form method="post" onsubmit="return confirm('Plugin-Secret wirklich neu generieren? Das Jellyfin-Plugin muss danach neu konfiguriert werden!')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="action" value="regenerate_secret">
+      <button type="submit" class="btn btn--outline btn--sm">
+        <i class="fas fa-arrows-rotate"></i>
+        Secret neu generieren
+      </button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function updateBgFields() {
+  const type = document.getElementById('bg_type').value;
+  document.getElementById('bg-color-field').style.display    = type === 'color'    ? '' : 'none';
+  document.getElementById('bg-image-field').style.display    = type === 'image'    ? '' : 'none';
+  document.getElementById('bg-gradient-field').style.display = type === 'gradient' ? '' : 'none';
+  document.getElementById('bg-overlay-field').style.display  = type === 'image'    ? '' : 'none';
+}
+
+// Sync hidden bg_value field before form submit
+const HAS_UPLOAD = {{ 'true' if has_bg_upload else 'false' }};
+document.querySelector('form').addEventListener('submit', function() {
+  const type = document.getElementById('bg_type').value;
+  let val = '';
+  if (type === 'color')    val = document.getElementById('bg_value_color').value;
+  if (type === 'gradient') val = document.getElementById('bg_value_gradient').value;
+  if (type === 'image') {
+    const typed = document.getElementById('bg_value_image').value.trim();
+    val = typed || (HAS_UPLOAD ? '/bg-image' : '');
+  }
+  document.getElementById('bg_value').value = val;
+});
+
+updateBgFields();
+
+// ── Background image upload via fetch (no nested form) ──────────────────────
+document.getElementById('bg-file-input').addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+
+  const icon = document.getElementById('upload-btn-icon');
+  const text = document.getElementById('upload-btn-text');
+  icon.className = 'fas fa-spinner fa-spin';
+  text.textContent = 'Hochladen…';
+
+  const fd = new FormData();
+  fd.append('bg_file', file);
+  fd.append('csrf_token', getCsrfToken());
+
+  try {
+    const res = await fetch('/admin/settings/upload-bg', {
+      method: 'POST',
+      body: fd,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    const json = await res.json();
+
+    if (json.ok) {
+      // Switch type selector to 'image' so form saves correctly
+      document.getElementById('bg_type').value = 'image';
+      updateBgFields();
+      document.getElementById('bg_value_image').value = '';
+      document.getElementById('bg_value').value = '/bg-image';
+      const wrap = document.getElementById('bg-upload-preview-wrap');
+      wrap.innerHTML = `
+        <div class="bg-upload-preview">
+          <img src="/bg-image?t=${Date.now()}" alt="Vorschau">
+          <div>
+            <div style="font-size:.8rem;font-weight:600">Hochgeladenes Bild</div>
+            <div class="form-hint">Wird als Hintergrund verwendet wenn kein URL eingetragen ist</div>
+          </div>
+        </div>`;
+      showToast('Bild hochgeladen!', 'success');
+    } else {
+      showToast(json.error || 'Fehler beim Hochladen.', 'error');
+    }
+  } catch (e) {
+    showToast('Netzwerkfehler beim Hochladen.', 'error');
+  } finally {
+    icon.className = 'fas fa-upload';
+    text.textContent = 'Datei hochladen';
+    this.value = '';
+  }
+});
+
+// ── Favicon upload ──────────────────────────────────────────────────────────
+document.getElementById('favicon-file-input').addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+  const icon = document.getElementById('favicon-icon');
+  const text = document.getElementById('favicon-text');
+  const status = document.getElementById('favicon-status');
+  icon.className = 'fas fa-spinner fa-spin';
+  text.textContent = 'Hochladen…';
+  status.textContent = '';
+
+  const fd = new FormData();
+  fd.append('favicon_file', file);
+  fd.append('csrf_token', getCsrfToken());
+
+  try {
+    const res = await fetch('/admin/settings/upload-favicon', {
+      method: 'POST', body: fd,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    const json = await res.json();
+    if (json.ok) {
+      showToast('Favicon hochgeladen!', 'success');
+      const preview = document.querySelector('.favicon-preview');
+      if (preview) {
+        preview.innerHTML = `<img src="/favicon.ico?t=${Date.now()}" alt="Favicon" style="width:32px;height:32px;border-radius:4px;object-fit:contain"><span class="form-hint">Aktuelles Favicon</span>`;
+        preview.classList.remove('favicon-preview--default');
+      }
+      text.textContent = 'Ersetzen';
+    } else {
+      showToast(json.error || 'Fehler beim Hochladen.', 'error');
+    }
+  } catch (e) {
+    showToast('Netzwerkfehler.', 'error');
+  } finally {
+    icon.className = 'fas fa-upload';
+    this.value = '';
+  }
+});
+
+function toggleSecret() {
+  const f = document.getElementById('plugin-secret-field');
+  const i = document.getElementById('toggle-secret-icon');
+  if (f.type === 'password') {
+    f.type = 'text';
+    i.className = 'fas fa-eye-slash';
+  } else {
+    f.type = 'password';
+    i.className = 'fas fa-eye';
+  }
+}
+</script>
+{% endblock %}

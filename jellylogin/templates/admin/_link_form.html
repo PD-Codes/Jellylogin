@@ -1,0 +1,76 @@
+<!-- Shared link form fields (add + edit) -->
+<div class="form-grid">
+  <div class="form-group form-group--span2">
+    <label for="f-name">Name <span class="required">*</span></label>
+    <input type="text" id="f-name" name="name" required placeholder="z.B. Jellyfin">
+  </div>
+
+  <div class="form-group form-group--span2">
+    <label for="f-url">URL <span class="required">*</span></label>
+    <input type="url" id="f-url" name="url" required placeholder="https://jellyfin.example.com">
+  </div>
+
+  <div class="form-group form-group--span2">
+    <label for="f-description">Beschreibung <span class="text-muted">(optional)</span></label>
+    <input type="text" id="f-description" name="description" placeholder="Kurze Beschreibung">
+  </div>
+
+  <div class="form-group">
+    <label for="f-icon">Icon <span class="text-muted">(Emoji, URL oder FA-Klasse)</span></label>
+    <input type="text" id="f-icon" name="icon" placeholder="🎬 oder https://… oder fa-solid fa-film">
+  </div>
+
+  <div class="form-group">
+    <label>Stil</label>
+    <div class="style-picker">
+      <label class="style-option">
+        <input type="radio" name="style" value="glass" checked>
+        <span class="style-preview style-preview--glass">Glass</span>
+      </label>
+      <label class="style-option">
+        <input type="radio" name="style" value="solid">
+        <span class="style-preview style-preview--solid">Solid</span>
+      </label>
+      <label class="style-option">
+        <input type="radio" name="style" value="minimal">
+        <span class="style-preview style-preview--minimal">Minimal</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="f-bg_color">Hintergrundfarbe</label>
+    <div class="color-input-wrapper">
+      <input type="color" id="f-bg_color" name="bg_color" value="#1e1b4b" class="color-input">
+      <input type="text" id="f-bg_color-text" value="#1e1b4b" class="color-text" maxlength="7"
+             oninput="document.getElementById('f-bg_color').value=this.value"
+             onchange="document.getElementById('f-bg_color-text').value=document.getElementById('f-bg_color').value">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="f-bg_image">Hintergrundbild-URL <span class="text-muted">(optional)</span></label>
+    <input type="url" id="f-bg_image" name="bg_image" placeholder="https://… (ersetzt Farbe)">
+  </div>
+
+  <div class="form-group">
+    <label for="f-category_id">Kategorie</label>
+    <select id="f-category_id" name="category_id">
+      <option value="">— Keine Kategorie —</option>
+      {% for cat in categories %}
+      <option value="{{ cat.id }}">{% if cat.icon %}{{ cat.icon }} {% endif %}{{ cat.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group" style="display:flex;flex-direction:column;gap:.5rem;padding-top:1.5rem">
+    <div class="form-check">
+      <input type="checkbox" id="f-open_in_new_tab" name="open_in_new_tab" checked>
+      <label for="f-open_in_new_tab">In neuem Tab öffnen</label>
+    </div>
+    <div class="form-check">
+      <input type="checkbox" id="f-check_status" name="check_status" checked>
+      <label for="f-check_status">Status prüfen</label>
+    </div>
+  </div>
+</div>
