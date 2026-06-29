@@ -87,3 +87,25 @@ class JellyfinClient:
             return resp.json()
         except requests.RequestException as exc:
             raise JellyfinError(f"Benutzerliste konnte nicht abgerufen werden: {exc}") from exc
+
+    def get_latest(self, limit: int = 8) -> list:
+        """Return the most recently added library items (movies, series, episodes)."""
+        try:
+            resp = self._get(
+                "/Items",
+                params={
+                    "SortBy": "DateCreated",
+                    "SortOrder": "Descending",
+                    "Recursive": "true",
+                    "IncludeItemTypes": "Movie,Series,Episode",
+                    "Limit": limit,
+                    "Fields": "PrimaryImageAspectRatio",
+                    "ImageTypeLimit": 1,
+                    "EnableImageTypes": "Primary",
+                },
+                timeout=8,
+            )
+            resp.raise_for_status()
+            return resp.json().get("Items", [])
+        except requests.RequestException as exc:
+            raise JellyfinError(f"Medien konnten nicht abgerufen werden: {exc}") from exc

@@ -108,6 +108,8 @@ function openEditModal(card) {
   set('category_id', card.category_id ?? '');
   set('open_in_new_tab', card.open_in_new_tab);
   set('check_status', card.check_status);
+  set('use_favicon', card.use_favicon);
+  set('admin_only', card.admin_only);
   set('is_visible', card.is_visible);
 
   // Sync color text box
@@ -331,11 +333,11 @@ async function checkStatus(linkId, dot) {
 
 /* ─── Admin: Drag-Sort ───────────────────────────────────────────────────── */
 function initLinkAdmin() {
-  initDragSort();
+  initDragSort('sortable-links', '/api/links/reorder');
 }
 
-function initDragSort() {
-  const tbody = document.getElementById('sortable-links');
+function initDragSort(tbodyId = 'sortable-links', endpoint = '/api/links/reorder') {
+  const tbody = document.getElementById(tbodyId);
   if (!tbody) return;
 
   let dragging = null;
@@ -352,7 +354,7 @@ function initDragSort() {
       row.classList.remove('dragging');
       tbody.querySelectorAll('.sortable-row').forEach(r => r.classList.remove('drag-over'));
       dragging = null;
-      saveOrder();
+      saveOrder(tbody, endpoint);
     });
     row.addEventListener('dragover', e => {
       e.preventDefault();
@@ -367,11 +369,11 @@ function initDragSort() {
   });
 }
 
-async function saveOrder() {
-  const rows = document.querySelectorAll('.sortable-row[data-id]');
+async function saveOrder(tbody, endpoint) {
+  const rows = tbody.querySelectorAll('.sortable-row[data-id]');
   const order = Array.from(rows).map(r => parseInt(r.dataset.id));
   try {
-    const res = await fetch('/api/links/reorder', {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
       body: JSON.stringify({ order }),
@@ -381,6 +383,84 @@ async function saveOrder() {
   } catch {
     showToast('Netzwerkfehler.', 'error');
   }
+}
+
+/* ─── Dashboard: favourites + announcement dismiss ───────────────────────── */
+function initDashboardInteractions() {
+  document.addEventListener('click', async e => {
+    const favBtn = e.target.closest('.fav-btn');
+    if (favBtn) {
+      e.preventDefault();
+      e.stopPropagation();
+      await toggleFavorite(favBtn);
+      return;
+    }
+    const dismissBtn = e.target.closest('.ann-dismiss');
+    if (dismissBtn) {
+      e.preventDefault();
+      await dismissAnnouncement(dismissBtn);
+    }
+  });
+}
+
+async function toggleFavorite(btn) {
+  const id = btn.dataset.id;
+  try {
+    const res = await fetch(`/api/favorites/${id}/toggle`, {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': getCsrfToken() },
+    });
+    if (!res.ok) { showToast('Fehler beim Speichern.', 'error'); return; }
+    const { favorited } = await res.json();
+    syncFavoriteState(id, favorited);
+    showToast(favorited ? 'Zu Favoriten hinzugefügt.' : 'Aus Favoriten entfernt.', 'success');
+  } catch {
+    showToast('Netzwerkfehler.', 'error');
+  }
+}
+
+function syncFavoriteState(id, favorited) {
+  const row = document.getElementById('favorites-row');
+  const section = document.getElementById('favorites-section');
+
+  if (favorited && row) {
+    // Clone a normal (non-pinned) card instance into the favourites row
+    const source = document.querySelector(`.links-grid .link-card[data-id="${id}"]`);
+    if (source && !row.querySelector(`.link-card[data-id="${id}"]`)) {
+      const clone = source.cloneNode(true);
+      clone.querySelector('.link-card__status')?.remove();  // avoid duplicate id
+      row.appendChild(clone);
+    }
+  } else if (row) {
+    row.querySelectorAll(`.link-card[data-id="${id}"]`).forEach(c => c.remove());
+  }
+
+  if (section) section.hidden = !row || row.children.length === 0;
+
+  // Update every star button for this link (both sections)
+  document.querySelectorAll(`.fav-btn[data-id="${id}"]`).forEach(b => {
+    b.classList.toggle('fav-btn--on', favorited);
+    const icon = b.querySelector('i');
+    if (icon) icon.className = `${favorited ? 'fas' : 'far'} fa-star`;
+  });
+}
+
+async function dismissAnnouncement(btn) {
+  const id = btn.dataset.id;
+  try {
+    const res = await fetch(`/api/announcements/${id}/dismiss`, {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': getCsrfToken() },
+    });
+    if (!res.ok) return;
+    const card = btn.closest('.ann-card');
+    card?.remove();
+    const aside = document.querySelector('.dashboard-aside .aside-list');
+    if (aside && aside.children.length === 0) {
+      document.querySelector('.dashboard-aside')?.remove();
+      document.querySelector('.dashboard-layout')?.classList.remove('dashboard-layout--with-aside');
+    }
+  } catch {}
 }
 
 /* ─── Auto-dismiss alerts ────────────────────────────────────────────────── */

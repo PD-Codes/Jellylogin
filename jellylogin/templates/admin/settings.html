@@ -126,23 +126,30 @@
     <!-- Hidden field carries the actual bg_value -->
     <input type="hidden" id="bg_value" name="bg_value" value="{{ bg_value }}">
 
-    <h2 class="admin-section-title" style="margin-top:2rem">Ankündigung</h2>
-    <div class="form-grid">
-      <div class="form-group form-group--span2">
-        <label for="announcement">Nachricht <span class="text-muted">(leer = deaktiviert)</span></label>
-        <input type="text" id="announcement" name="announcement" value="{{ announcement }}" maxlength="300"
-               placeholder="Nachricht für alle Benutzer auf dem Dashboard">
-      </div>
+    <p class="text-sec" style="font-size:.875rem;margin-top:2rem">
+      <i class="fas fa-bullhorn"></i>
+      Ankündigungen werden jetzt unter
+      <a href="{{ url_for('admin.announcements') }}">Ankündigungen</a> verwaltet.
+    </p>
 
+    <h2 class="admin-section-title" style="margin-top:2rem">Zuletzt hinzugefügt (Jellyfin)</h2>
+    <div class="form-check" style="margin-bottom:1rem">
+      <input type="checkbox" id="show_latest_media" name="show_latest_media" {{ 'checked' if show_latest_media }}>
+      <label for="show_latest_media">Sektion „Zuletzt hinzugefügt" auf dem Dashboard anzeigen</label>
+    </div>
+    <div class="form-grid">
       <div class="form-group">
-        <label for="announcement_type">Typ</label>
-        <select id="announcement_type" name="announcement_type">
-          <option value="info" {{ 'selected' if announcement_type == 'info' }}>ℹ️ Info</option>
-          <option value="warning" {{ 'selected' if announcement_type == 'warning' }}>⚠️ Warnung</option>
-          <option value="success" {{ 'selected' if announcement_type == 'success' }}>✅ Erfolg</option>
-        </select>
+        <label for="latest_media_count">Anzahl Titel</label>
+        <input type="number" id="latest_media_count" name="latest_media_count"
+               min="1" max="24" value="{{ latest_media_count }}">
+      </div>
+      <div class="form-group">
+        <label for="latest_media_cache_seconds">Cache (Sekunden)</label>
+        <input type="number" id="latest_media_cache_seconds" name="latest_media_cache_seconds"
+               min="30" max="3600" value="{{ latest_media_cache_seconds }}">
       </div>
     </div>
+    <p class="form-hint">Nutzt die unter „Jellyfin" hinterlegte Server-URL und den API-Key.</p>
 
     <div class="form-actions">
       <button type="submit" class="btn btn--primary">
@@ -150,6 +157,32 @@
       </button>
     </div>
   </form>
+
+  <!-- Config Import / Export -->
+  <div class="admin-section">
+    <h2 class="admin-section-title">Konfiguration sichern</h2>
+    <p class="text-sec" style="font-size:.875rem;margin-bottom:1rem">
+      Exportiere alle Links, Kategorien, Ankündigungen und Einstellungen als JSON-Datei
+      oder stelle sie aus einem Backup wieder her. <strong>Hinweis:</strong> Ein Import
+      <em>ersetzt</em> die vorhandenen Links, Kategorien und Ankündigungen.
+    </p>
+    <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+      <a href="{{ url_for('admin.export_config') }}" class="btn btn--outline btn--sm">
+        <i class="fas fa-download"></i> Exportieren
+      </a>
+      <form method="post" action="{{ url_for('admin.import_config') }}"
+            enctype="multipart/form-data" class="inline-form"
+            style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap"
+            onsubmit="return confirm('Import ersetzt bestehende Links, Kategorien und Ankündigungen. Fortfahren?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="file" name="config_file" accept=".json,application/json" required
+               class="form-input" style="max-width:240px">
+        <button type="submit" class="btn btn--outline btn--sm">
+          <i class="fas fa-upload"></i> Importieren
+        </button>
+      </form>
+    </div>
+  </div>
 
   <!-- Favicon -->
   <div class="admin-section">
@@ -180,6 +213,18 @@
       <span class="form-hint">ICO, PNG, SVG, JPG — max. 2 MB</span>
     </div>
     <div id="favicon-status" style="margin-top:.5rem"></div>
+
+    <hr class="settings-divider">
+    <p class="text-sec" style="font-size:.875rem;margin-bottom:.75rem">
+      Karten-Favicons werden von den verlinkten Seiten geladen und zwischengespeichert.
+      Leere den Cache, wenn eine Seite ihr Icon geändert hat.
+    </p>
+    <form method="post" action="{{ url_for('admin.clear_favicon_cache') }}" class="inline-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="btn btn--outline btn--sm">
+        <i class="fas fa-arrows-rotate"></i> Favicon-Cache leeren
+      </button>
+    </form>
   </div>
 
   <!-- Plugin Secret -->

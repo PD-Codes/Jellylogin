@@ -18,6 +18,10 @@
   <div class="form-group">
     <label for="f-icon">Icon <span class="text-muted">(Emoji, URL oder FA-Klasse)</span></label>
     <input type="text" id="f-icon" name="icon" placeholder="🎬 oder https://… oder fa-solid fa-film">
+    <div class="form-check" style="margin-top:.5rem">
+      <input type="checkbox" id="f-use_favicon" name="use_favicon" checked>
+      <label for="f-use_favicon">Favicon der Seite verwenden <span class="text-muted">(überschreibt Icon)</span></label>
+    </div>
   </div>
 
   <div class="form-group">
@@ -71,6 +75,10 @@
     <div class="form-check">
       <input type="checkbox" id="f-check_status" name="check_status" checked>
       <label for="f-check_status">Status prüfen</label>
+    </div>
+    <div class="form-check">
+      <input type="checkbox" id="f-admin_only" name="admin_only">
+      <label for="f-admin_only">Nur für Admins sichtbar</label>
     </div>
   </div>
 </div>

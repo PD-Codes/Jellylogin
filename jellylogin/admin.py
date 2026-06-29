@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import secrets
@@ -5,6 +6,7 @@ from datetime import datetime
 
 from flask import (
     Blueprint,
+    Response,
     current_app,
     flash,
     jsonify,
@@ -18,7 +20,21 @@ from flask import (
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
 
-from .models import Category, JellyfinConfig, LinkCard, Setting, User, db
+from .models import (
+    ANNOUNCEMENT_SEVERITIES,
+    Announcement,
+    AnnouncementDismissal,
+    Category,
+    Favorite,
+    JellyfinConfig,
+    LinkCard,
+    Setting,
+    User,
+    db,
+)
+
+# Settings keys that are never exported/imported (secret material)
+_CONFIG_SECRET_KEYS = {"plugin_secret", "setup_complete"}
 from .security import generate_csrf_token, validate_csrf
 
 admin_bp = Blueprint("admin", __name__)
@@ -111,6 +127,8 @@ def create_link():
         open_in_new_tab=request.form.get("open_in_new_tab") == "on",
         category_id=cat_id,
         check_status=request.form.get("check_status") == "on",
+        use_favicon=request.form.get("use_favicon") == "on",
+        admin_only=request.form.get("admin_only") == "on",
         is_visible=True,
         order=LinkCard.query.count(),
     )
@@ -153,6 +171,8 @@ def edit_link(link_id: int):
     card.open_in_new_tab = request.form.get("open_in_new_tab") == "on"
     card.category_id = cat_id
     card.check_status = request.form.get("check_status") == "on"
+    card.use_favicon = request.form.get("use_favicon") == "on"
+    card.admin_only = request.form.get("admin_only") == "on"
     card.is_visible = request.form.get("is_visible") == "on"
 
     db.session.commit()
@@ -189,7 +209,12 @@ def create_category():
     if not name:
         flash("Name ist ein Pflichtfeld.", "error")
         return redirect(url_for("admin.links"))
-    cat = Category(name=name, icon=request.form.get("icon", "").strip() or None, order=Category.query.count())
+    cat = Category(
+        name=name,
+        icon=request.form.get("icon", "").strip() or None,
+        admin_only=request.form.get("admin_only") == "on",
+        order=Category.query.count(),
+    )
     db.session.add(cat)
     db.session.commit()
     flash(f'Kategorie „{name}" erstellt.', "success")
@@ -205,6 +230,105 @@ def delete_category(cat_id: int):
     db.session.commit()
     flash(f'Kategorie „{name}" gelöscht (Links wurden entkategorisiert).', "success")
     return redirect(url_for("admin.links"))
+
+
+# ── Announcements ────────────────────────────────────────────────────────────
+
+@admin_bp.route("/announcements")
+def announcements():
+    items = Announcement.query.order_by(
+        Announcement.order, Announcement.created_at.desc()
+    ).all()
+    return render_template(
+        "admin/announcements.html",
+        announcements=items,
+        severities=ANNOUNCEMENT_SEVERITIES,
+        now=datetime.utcnow(),
+        csrf_token=generate_csrf_token(),
+        username=session.get("username"),
+        site_name=_setting("site_name", "DKS Media Hub"),
+    )
+
+
+def _clean_severity(value: str) -> str:
+    value = (value or "").strip().lower()
+    return value if value in ANNOUNCEMENT_SEVERITIES else "info"
+
+
+def _parse_dt(value: str):
+    """Parse an <input type=datetime-local> value into a datetime, or None."""
+    value = (value or "").strip()
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+@admin_bp.route("/announcements/create", methods=["POST"])
+def create_announcement():
+    validate_csrf()
+    title = request.form.get("title", "").strip()
+    if not title:
+        flash("Titel ist ein Pflichtfeld.", "error")
+        return redirect(url_for("admin.announcements"))
+
+    item = Announcement(
+        title=title[:120],
+        body=request.form.get("body", "").strip() or None,
+        severity=_clean_severity(request.form.get("severity")),
+        is_active=request.form.get("is_active") == "on",
+        start_at=_parse_dt(request.form.get("start_at")),
+        end_at=_parse_dt(request.form.get("end_at")),
+        order=Announcement.query.count(),
+    )
+    db.session.add(item)
+    db.session.commit()
+    flash(f'Ankündigung „{title}" erstellt.', "success")
+    return redirect(url_for("admin.announcements"))
+
+
+@admin_bp.route("/announcements/<int:ann_id>/edit", methods=["POST"])
+def edit_announcement(ann_id: int):
+    validate_csrf()
+    item = Announcement.query.get_or_404(ann_id)
+    title = request.form.get("title", "").strip()
+    if not title:
+        flash("Titel ist ein Pflichtfeld.", "error")
+        return redirect(url_for("admin.announcements"))
+
+    item.title = title[:120]
+    item.body = request.form.get("body", "").strip() or None
+    item.severity = _clean_severity(request.form.get("severity"))
+    item.is_active = request.form.get("is_active") == "on"
+    item.start_at = _parse_dt(request.form.get("start_at"))
+    item.end_at = _parse_dt(request.form.get("end_at"))
+    db.session.commit()
+    flash(f'Ankündigung „{title}" aktualisiert.', "success")
+    return redirect(url_for("admin.announcements"))
+
+
+@admin_bp.route("/announcements/<int:ann_id>/toggle", methods=["POST"])
+def toggle_announcement(ann_id: int):
+    validate_csrf()
+    item = Announcement.query.get_or_404(ann_id)
+    item.is_active = not item.is_active
+    db.session.commit()
+    return redirect(url_for("admin.announcements"))
+
+
+@admin_bp.route("/announcements/<int:ann_id>/delete", methods=["POST"])
+def delete_announcement(ann_id: int):
+    validate_csrf()
+    item = Announcement.query.get_or_404(ann_id)
+    title = item.title
+    db.session.delete(item)
+    db.session.commit()
+    flash(f'Ankündigung „{title}" gelöscht.', "success")
+    return redirect(url_for("admin.announcements"))
 
 
 # ── Users ────────────────────────────────────────────────────────────────────
@@ -467,6 +591,45 @@ def upload_favicon():
     return redirect(url_for("admin.settings"))
 
 
+@admin_bp.route("/favicon-cache/clear", methods=["POST"])
+def clear_favicon_cache():
+    """Delete all cached site favicons; they are re-fetched on next view."""
+    validate_csrf()
+    cache_dir = os.path.join(current_app.config["DATA_DIR"], "favicons")
+    removed = 0
+    if os.path.isdir(cache_dir):
+        for fname in os.listdir(cache_dir):
+            try:
+                os.remove(os.path.join(cache_dir, fname))
+                removed += 1
+            except OSError:
+                pass
+    flash(f"Favicon-Cache geleert ({removed} Dateien).", "success")
+    return redirect(url_for("admin.settings"))
+
+
+@admin_bp.route("/links/<int:link_id>/favicon-refresh", methods=["POST"])
+def refresh_link_favicon(link_id: int):
+    """Drop the cached favicon for one link's origin so it is re-fetched."""
+    import hashlib
+    from .api import _origin
+
+    validate_csrf()
+    card = LinkCard.query.get_or_404(link_id)
+    cache_dir = os.path.join(current_app.config["DATA_DIR"], "favicons")
+    origin = _origin(card.url)
+    if origin and os.path.isdir(cache_dir):
+        key = hashlib.sha1(origin.encode()).hexdigest()
+        for fname in os.listdir(cache_dir):
+            if fname == f"{key}.miss" or fname.startswith(f"{key}."):
+                try:
+                    os.remove(os.path.join(cache_dir, fname))
+                except OSError:
+                    pass
+    flash(f'Favicon für „{card.name}" wird neu geladen.', "success")
+    return redirect(url_for("admin.links"))
+
+
 # ── Login-Page Designer ──────────────────────────────────────────────────────
 
 @admin_bp.route("/login-design/upload-logo", methods=["POST"])
@@ -554,6 +717,141 @@ def login_design():
     )
 
 
+# ── Config Import / Export ───────────────────────────────────────────────────
+
+@admin_bp.route("/config/export")
+def export_config():
+    """Download all links, categories, announcements and settings as JSON."""
+    data = {
+        "version": 1,
+        "exported_at": datetime.utcnow().isoformat(),
+        "categories": [c.to_dict() for c in Category.query.order_by(Category.order).all()],
+        "links": [l.to_dict() for l in LinkCard.query.order_by(LinkCard.order).all()],
+        "announcements": [
+            a.to_dict() for a in Announcement.query.order_by(Announcement.order).all()
+        ],
+        "settings": {
+            s.key: s.value
+            for s in Setting.query.all()
+            if s.key not in _CONFIG_SECRET_KEYS
+        },
+    }
+    payload = json.dumps(data, indent=2, ensure_ascii=False)
+    stamp = datetime.utcnow().strftime("%Y%m%d-%H%M")
+    return Response(
+        payload,
+        mimetype="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="jellylogin-config-{stamp}.json"'
+        },
+    )
+
+
+@admin_bp.route("/config/import", methods=["POST"])
+def import_config():
+    """Replace links, categories and announcements from an uploaded JSON file."""
+    validate_csrf()
+    f = request.files.get("config_file")
+    if not f or not f.filename:
+        flash("Keine Datei ausgewählt.", "error")
+        return redirect(url_for("admin.settings"))
+
+    try:
+        data = json.loads(f.read().decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        flash("Ungültige JSON-Datei.", "error")
+        return redirect(url_for("admin.settings"))
+
+    if not isinstance(data, dict):
+        flash("Unerwartetes Dateiformat.", "error")
+        return redirect(url_for("admin.settings"))
+
+    try:
+        # Clear dependent per-user data and existing content
+        AnnouncementDismissal.query.delete()
+        Favorite.query.delete()
+        LinkCard.query.delete()
+        Category.query.delete()
+        Announcement.query.delete()
+        db.session.flush()
+
+        # Recreate categories, keeping a map from exported id -> new object
+        cat_map = {}
+        for c in data.get("categories", []):
+            cat = Category(
+                name=(c.get("name") or "Unbenannt")[:80],
+                icon=c.get("icon") or None,
+                order=int(c.get("order", 0) or 0),
+                admin_only=bool(c.get("admin_only", False)),
+            )
+            db.session.add(cat)
+            db.session.flush()
+            if c.get("id") is not None:
+                cat_map[c["id"]] = cat
+
+        # Recreate links, remapping their category reference
+        for l in data.get("links", []):
+            if not l.get("name") or not l.get("url"):
+                continue
+            old_cat = l.get("category_id")
+            new_cat = cat_map.get(old_cat)
+            db.session.add(LinkCard(
+                name=l["name"][:80],
+                url=l["url"][:512],
+                description=(l.get("description") or None),
+                icon=(l.get("icon") or None),
+                bg_color=l.get("bg_color", "#1e1b4b"),
+                bg_image=(l.get("bg_image") or None),
+                style=l.get("style", "glass"),
+                open_in_new_tab=bool(l.get("open_in_new_tab", True)),
+                category_id=new_cat.id if new_cat else None,
+                order=int(l.get("order", 0) or 0),
+                check_status=bool(l.get("check_status", True)),
+                is_visible=bool(l.get("is_visible", True)),
+                use_favicon=bool(l.get("use_favicon", True)),
+                admin_only=bool(l.get("admin_only", False)),
+            ))
+
+        # Recreate announcements
+        for a in data.get("announcements", []):
+            if not a.get("title"):
+                continue
+            db.session.add(Announcement(
+                title=a["title"][:120],
+                body=(a.get("body") or None),
+                severity=_clean_severity(a.get("severity")),
+                is_active=bool(a.get("is_active", True)),
+                order=int(a.get("order", 0) or 0),
+                start_at=_parse_iso(a.get("start_at")),
+                end_at=_parse_iso(a.get("end_at")),
+            ))
+
+        # Upsert settings (skipping secret keys)
+        for key, value in (data.get("settings") or {}).items():
+            if key in _CONFIG_SECRET_KEYS:
+                continue
+            _set_setting(key, "" if value is None else str(value))
+
+        db.session.commit()
+    except Exception as exc:  # noqa: BLE001 — surface any import failure to the user
+        db.session.rollback()
+        flash(f"Import fehlgeschlagen: {exc}", "error")
+        return redirect(url_for("admin.settings"))
+
+    flash("Konfiguration importiert.", "success")
+    return redirect(url_for("admin.settings"))
+
+
+def _parse_iso(value):
+    """Parse an ISO datetime string from an export file, or None."""
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except (ValueError, TypeError):
+        return None
+
+
 @admin_bp.route("/settings", methods=["GET", "POST"])
 def settings():
     if request.method == "POST":
@@ -567,10 +865,10 @@ def settings():
             return redirect(url_for("admin.settings"))
 
         keys = ["site_name", "site_description", "show_status", "status_cache_seconds",
-                "announcement", "announcement_type",
-                "bg_type", "bg_value", "bg_overlay"]
+                "bg_type", "bg_value", "bg_overlay",
+                "show_latest_media", "latest_media_count", "latest_media_cache_seconds"]
         for key in keys:
-            if key in ("show_status",):
+            if key in ("show_status", "show_latest_media"):
                 _set_setting(key, "true" if request.form.get(key) == "on" else "false")
             else:
                 _set_setting(key, request.form.get(key, "").strip())
@@ -589,11 +887,12 @@ def settings():
         site_description=_setting("site_description", ""),
         show_status=_setting("show_status", "true") == "true",
         status_cache_seconds=_setting("status_cache_seconds", "60"),
-        announcement=_setting("announcement", ""),
-        announcement_type=_setting("announcement_type", "info"),
         bg_type=_setting("bg_type", "none"),
         bg_value=_setting("bg_value", ""),
         bg_overlay=_setting("bg_overlay", "0.5"),
+        show_latest_media=_setting("show_latest_media", "false") == "true",
+        latest_media_count=_setting("latest_media_count", "8"),
+        latest_media_cache_seconds=_setting("latest_media_cache_seconds", "300"),
         plugin_secret=_setting("plugin_secret", ""),
         has_favicon=favicon_exists,
         csrf_token=generate_csrf_token(),

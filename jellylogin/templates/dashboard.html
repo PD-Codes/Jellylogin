@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {% block title %}{{ site_name }}{% endblock %}
 
-{% macro _render_card(card, show_status) %}
+{% macro _render_card(card, show_status, favorite_ids=None) %}
+{% set is_fav = favorite_ids and card.id in favorite_ids %}
 <a href="{{ card.url }}"
    class="link-card link-card--{{ card.style }}"
    {% if card.open_in_new_tab %}target="_blank" rel="noopener noreferrer"{% endif %}
@@ -14,8 +15,17 @@
      style="--card-bg-color: {{ card.bg_color }};"
    {% endif %}
 >
+  <button type="button" class="fav-btn {{ 'fav-btn--on' if is_fav }}"
+          data-id="{{ card.id }}" title="Als Favorit anheften"
+          aria-label="Favorit umschalten">
+    <i class="{{ 'fas' if is_fav else 'far' }} fa-star"></i>
+  </button>
   <div class="link-card__icon">
-    {% if card.icon %}
+    {% if card.use_favicon %}
+      {# Fetched site favicon, served (and cached) by the backend #}
+      <img src="{{ url_for('api.favicon', link_id=card.id) }}" alt="{{ card.name }}"
+           loading="lazy" class="link-card__favicon">
+    {% elif card.icon %}
       {% if card.icon.startswith('http') or card.icon.startswith('/') %}
         <img src="{{ card.icon }}" alt="{{ card.name }}" loading="lazy">
       {% elif card.icon.startswith('fa') %}
@@ -95,23 +105,27 @@
 
 <!-- Main -->
 <main class="main">
-
-  <!-- Announcement -->
-  {% if announcement %}
-  <div class="announcement announcement--{{ announcement_type }}">
-    <i class="fas fa-{{ 'circle-info' if announcement_type == 'info' else ('triangle-exclamation' if announcement_type == 'warning' else 'circle-check') }}"></i>
-    {{ announcement }}
-    <button class="announcement-close" onclick="this.parentElement.remove()">
-      <i class="fas fa-xmark"></i>
-    </button>
-  </div>
-  {% endif %}
+<div class="dashboard-layout {{ 'dashboard-layout--with-aside' if announcements }}">
+<div class="dashboard-content">
 
   <!-- Header -->
   <div class="page-header">
     {% if site_description %}
     <p class="page-subtitle">{{ site_description }}</p>
     {% endif %}
+  </div>
+
+  <!-- Favourites -->
+  <div class="links-section favorites-section" id="favorites-section" {{ 'hidden' if not favorites }}>
+    <h2 class="links-section-title">
+      <i class="fas fa-star" style="color:var(--color-warning)"></i>
+      Favoriten
+    </h2>
+    <div class="links-row" id="favorites-row">
+      {% for card in favorites %}
+      {{ _render_card(card, show_status, favorite_ids) }}
+      {% endfor %}
+    </div>
   </div>
 
   <!-- Category Tabs -->
@@ -123,7 +137,9 @@
       Alle
     </button>
     {% for cat in categories %}
-    {% if cat.links|selectattr('is_visible')|list|length > 0 %}
+    {% set tab_links = cat.links|selectattr('is_visible')|list %}
+    {% if not is_admin %}{% set tab_links = tab_links|rejectattr('admin_only')|list %}{% endif %}
+    {% if tab_links|length > 0 %}
     <button class="category-tab" data-cat="{{ cat.id }}">
       {% if cat.icon %}{{ cat.icon }}{% else %}<i class="fas fa-folder"></i>{% endif %}
       {{ cat.name }}
@@ -145,6 +161,7 @@
     <!-- Categorized -->
     {% for cat in categories %}
     {% set visible_links = cat.links|selectattr('is_visible')|list %}
+    {% if not is_admin %}{% set visible_links = visible_links|rejectattr('admin_only')|list %}{% endif %}
     {% if visible_links %}
     <div class="links-section" data-cat="{{ cat.id }}">
       {% if has_categories %}
@@ -155,7 +172,7 @@
       {% endif %}
       <div class="links-row">
         {% for card in visible_links %}
-        {{ _render_card(card, show_status) }}
+        {{ _render_card(card, show_status, favorite_ids) }}
         {% endfor %}
       </div>
     </div>
@@ -173,7 +190,32 @@
       {% endif %}
       <div class="links-row">
         {% for card in uncategorized %}
-        {{ _render_card(card, show_status) }}
+        {{ _render_card(card, show_status, favorite_ids) }}
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Recently added from Jellyfin -->
+    {% if latest_media %}
+    <div class="links-section latest-media-section">
+      <h2 class="links-section-title">
+        <i class="fas fa-clapperboard"></i>
+        Zuletzt hinzugefügt
+      </h2>
+      <div class="media-row">
+        {% for m in latest_media %}
+        <a href="{{ m.link_url }}" class="media-card" target="_blank" rel="noopener noreferrer">
+          <div class="media-card__poster">
+            {% if m.image_url %}
+            <img src="{{ m.image_url }}" alt="{{ m.name }}" loading="lazy">
+            {% else %}
+            <div class="media-card__placeholder"><i class="fas fa-film"></i></div>
+            {% endif %}
+          </div>
+          <div class="media-card__name">{{ m.name }}</div>
+          {% if m.subtitle %}<div class="media-card__sub">{{ m.subtitle }}</div>{% endif %}
+        </a>
         {% endfor %}
       </div>
     </div>
@@ -198,11 +240,46 @@
     <div class="search-results" id="search-results" hidden></div>
   </div>
 
+</div><!-- /.dashboard-content -->
+
+  {% if announcements %}
+  <aside class="dashboard-aside" aria-label="Ankündigungen">
+    <div class="aside-header">
+      <i class="fas fa-bullhorn"></i>
+      <span>Ankündigungen</span>
+    </div>
+    <div class="aside-list">
+      {% for ann in announcements %}
+      {% set icon = 'circle-info' if ann.severity == 'info' else ('triangle-exclamation' if ann.severity == 'warning' else 'circle-exclamation') %}
+      <article class="ann-card ann-card--{{ ann.severity }}" data-id="{{ ann.id }}">
+        <button type="button" class="ann-dismiss" data-id="{{ ann.id }}"
+                title="Ausblenden" aria-label="Ankündigung ausblenden">
+          <i class="fas fa-xmark"></i>
+        </button>
+        <div class="ann-card__head">
+          <i class="fas fa-{{ icon }} ann-card__icon"></i>
+          <h3 class="ann-card__title">{{ ann.title }}</h3>
+        </div>
+        {% if ann.body %}
+        <p class="ann-card__body">{{ ann.body }}</p>
+        {% endif %}
+        <time class="ann-card__date" datetime="{{ ann.created_at.isoformat() }}">
+          {{ ann.created_at.strftime('%d.%m.%Y') }}
+        </time>
+      </article>
+      {% endfor %}
+    </div>
+  </aside>
+  {% endif %}
+
+</div><!-- /.dashboard-layout -->
 </main>
 
 {% block scripts %}
 <script>
   const SHOW_STATUS = {{ 'true' if show_status else 'false' }};
+  const CSRF_TOKEN = {{ csrf_token|tojson }};
+  initDashboardInteractions();
 </script>
 {% endblock %}
 {% endblock %}

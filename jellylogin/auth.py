@@ -1,4 +1,5 @@
 import functools
+import time
 from datetime import datetime
 
 from flask import (
@@ -12,7 +13,20 @@ from flask import (
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from .models import JellyfinConfig, LinkCard, Category, Setting, User, db
+from .models import (
+    Announcement,
+    AnnouncementDismissal,
+    Category,
+    Favorite,
+    JellyfinConfig,
+    LinkCard,
+    Setting,
+    User,
+    db,
+)
+
+# Server-side cache for the Jellyfin "recently added" section
+_latest_media_cache = {"items": None, "ts": 0.0}
 from .security import (
     check_rate_limit,
     clear_attempts,
@@ -186,26 +200,133 @@ def logout():
 @auth_bp.route("/dashboard")
 @login_required
 def dashboard():
+    uid = session["user_id"]
+    is_admin = session.get("role") == "admin"
+
+    # Categories: hide admin-only categories from non-admins
     categories = Category.query.order_by(Category.order).all()
+    if not is_admin:
+        categories = [c for c in categories if not c.admin_only]
+
     uncategorized = (
         LinkCard.query
         .filter_by(category_id=None, is_visible=True)
         .order_by(LinkCard.order)
         .all()
     )
-    announcement = _get_setting("announcement", "")
-    announcement_type = _get_setting("announcement_type", "info")
+    if not is_admin:
+        uncategorized = [c for c in uncategorized if not c.admin_only]
+
     show_status = _get_setting("show_status", "true") == "true"
+
+    # Favourites — pinned cards for this user (respecting visibility + role)
+    fav_ids = {f.link_id for f in Favorite.query.filter_by(user_id=uid).all()}
+    favorites = []
+    if fav_ids:
+        fav_cards = (
+            LinkCard.query
+            .filter(LinkCard.id.in_(fav_ids), LinkCard.is_visible.is_(True))
+            .order_by(LinkCard.order)
+            .all()
+        )
+        favorites = [c for c in fav_cards if _card_visible_to(c, is_admin)]
+
+    # Announcements — live ones, minus those this user dismissed after last edit
+    now = datetime.utcnow()
+    live = [
+        a for a in Announcement.query
+        .order_by(Announcement.order, Announcement.created_at.desc())
+        .all()
+        if a.is_live(now)
+    ]
+    dismissed = {
+        d.announcement_id: d.dismissed_at
+        for d in AnnouncementDismissal.query.filter_by(user_id=uid).all()
+    }
+    announcements = [
+        a for a in live
+        if not (a.id in dismissed and dismissed[a.id] >= a.updated_at)
+    ]
 
     return render_template(
         "dashboard.html",
         categories=categories,
         uncategorized=uncategorized,
+        favorites=favorites,
+        favorite_ids=fav_ids,
+        latest_media=_get_latest_media(),
         site_name=_get_setting("site_name", "DKS Media Hub"),
         site_description=_get_setting("site_description", ""),
         show_status=show_status,
-        announcement=announcement,
-        announcement_type=announcement_type,
+        announcements=announcements,
+        is_admin=is_admin,
+        csrf_token=generate_csrf_token(),
         role=session.get("role"),
         username=session.get("username"),
     )
+
+
+def _card_visible_to(card, is_admin: bool) -> bool:
+    """Whether a card is visible to the current user (role + its category)."""
+    if card.admin_only and not is_admin:
+        return False
+    if card.category and card.category.admin_only and not is_admin:
+        return False
+    return True
+
+
+def _get_latest_media():
+    """Return cached Jellyfin 'recently added' items, refreshing on TTL.
+
+    Each item is a dict with name, subtitle, image_url and link_url.
+    Returns an empty list if disabled, unconfigured, or unreachable.
+    """
+    if _get_setting("show_latest_media", "false") != "true":
+        return []
+
+    try:
+        ttl = int(_get_setting("latest_media_cache_seconds", "300"))
+    except ValueError:
+        ttl = 300
+    if _latest_media_cache["items"] is not None and \
+            time.time() - _latest_media_cache["ts"] < ttl:
+        return _latest_media_cache["items"]
+
+    cfg = JellyfinConfig.query.first()
+    if not cfg or not cfg.server_url or not cfg.api_key:
+        return []
+
+    try:
+        count = int(_get_setting("latest_media_count", "8"))
+    except ValueError:
+        count = 8
+
+    items = []
+    try:
+        from .jellyfin import JellyfinClient, JellyfinError
+        client = JellyfinClient(cfg.server_url, cfg.api_key)
+        base = cfg.server_url.rstrip("/")
+        for it in client.get_latest(count):
+            iid = it.get("Id")
+            if not iid:
+                continue
+            tag = (it.get("ImageTags") or {}).get("Primary")
+            image_url = (
+                f"{base}/Items/{iid}/Images/Primary?fillHeight=330&quality=90"
+                + (f"&tag={tag}" if tag else "")
+            ) if tag else None
+            name = it.get("SeriesName") or it.get("Name") or "?"
+            subtitle = it.get("Name") if it.get("SeriesName") else it.get("Type", "")
+            items.append({
+                "name": name,
+                "subtitle": subtitle,
+                "image_url": image_url,
+                "link_url": f"{base}/web/#/details?id={iid}",
+            })
+    except Exception:
+        # On any failure, fall back to the last good cache (or empty)
+        return _latest_media_cache["items"] or []
+
+    _latest_media_cache["items"] = items
+    _latest_media_cache["ts"] = time.time()
+    return items

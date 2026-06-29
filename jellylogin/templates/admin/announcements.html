@@ -1,0 +1,170 @@
+{% extends "admin/layout.html" %}
+{% block title %}Ankündigungen — Admin{% endblock %}
+
+{% set severity_meta = {
+  'info':     {'label': 'Info',     'icon': 'fa-circle-info'},
+  'warning':  {'label': 'Warnung',  'icon': 'fa-triangle-exclamation'},
+  'critical': {'label': 'Kritisch', 'icon': 'fa-circle-exclamation'}
+} %}
+
+{% block admin_content %}
+<div class="admin-page">
+  <div class="admin-page-header">
+    <h1 class="admin-page-title"><i class="fas fa-bullhorn"></i> Ankündigungen</h1>
+    <button class="btn btn--primary" onclick="openModal('modal-add-ann')">
+      <i class="fas fa-plus"></i> Neue Ankündigung
+    </button>
+  </div>
+
+  <p class="text-sec" style="font-size:.875rem;margin-bottom:1.5rem">
+    Ankündigungen erscheinen rechts auf dem Dashboard. Nur aktive Einträge werden angezeigt.
+  </p>
+
+  <div class="admin-section">
+    <h2 class="admin-section-title">Alle Ankündigungen <span class="count-badge">{{ announcements|length }}</span></h2>
+    {% if announcements %}
+    <div class="admin-table-wrapper">
+      <table class="admin-table" id="announcements-table">
+        <thead>
+          <tr>
+            <th style="width:40px" class="hide-mobile"></th>
+            <th>Titel</th>
+            <th class="hide-mobile">Severity</th>
+            <th class="hide-mobile">Zeitraum</th>
+            <th>Aktiv</th>
+            <th style="width:120px">Aktionen</th>
+          </tr>
+        </thead>
+        <tbody id="sortable-announcements">
+          {% for ann in announcements %}
+          {% set meta = severity_meta.get(ann.severity, severity_meta['info']) %}
+          {% set live = ann.is_live() %}
+          <tr class="sortable-row" data-id="{{ ann.id }}">
+            <td class="drag-handle hide-mobile" title="Zum Sortieren ziehen">
+              <i class="fas fa-grip-vertical"></i>
+            </td>
+            <td>
+              <div class="table-name">
+                <span class="table-icon severity-icon severity-icon--{{ ann.severity }}">
+                  <i class="fas {{ meta.icon }}"></i>
+                </span>
+                <span>{{ ann.title }}</span>
+                {% if ann.is_active and not live %}
+                <span class="badge badge--muted" style="margin-left:.4rem">{{ 'geplant' if ann.start_at and ann.start_at > now else 'abgelaufen' }}</span>
+                {% endif %}
+                {% if ann.body %}
+                <span class="text-muted" style="font-size:.75rem;display:block">{{ ann.body|truncate(80) }}</span>
+                {% endif %}
+              </div>
+            </td>
+            <td class="hide-mobile">
+              <span class="badge severity-badge severity-badge--{{ ann.severity }}">{{ meta.label }}</span>
+            </td>
+            <td class="hide-mobile table-date">
+              {% if ann.start_at or ann.end_at %}
+                {{ ann.start_at.strftime('%d.%m.%Y %H:%M') if ann.start_at else '—' }}
+                <br>bis {{ ann.end_at.strftime('%d.%m.%Y %H:%M') if ann.end_at else '—' }}
+              {% else %}
+                <span class="text-muted">dauerhaft</span>
+              {% endif %}
+            </td>
+            <td>
+              <form method="post" action="{{ url_for('admin.toggle_announcement', ann_id=ann.id) }}" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="toggle-btn {{ 'toggle-btn--on' if ann.is_active else 'toggle-btn--off' }}"
+                        title="{{ 'Deaktivieren' if ann.is_active else 'Aktivieren' }}">
+                  <span class="toggle-thumb"></span>
+                </button>
+              </form>
+            </td>
+            <td class="table-actions">
+              <button class="icon-btn icon-btn--edit" title="Bearbeiten"
+                onclick='openEditAnnouncement({{ ann.to_dict()|tojson }})'>
+                <i class="fas fa-pen"></i>
+              </button>
+              <form method="post" action="{{ url_for('admin.delete_announcement', ann_id=ann.id) }}" class="inline-form"
+                    onsubmit='return confirm("Ankündigung \"{{ ann.title|e }}\" wirklich löschen?")'>
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit" class="icon-btn icon-btn--delete" title="Löschen">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-state empty-state--sm">
+      <div class="empty-state-icon"><i class="fas fa-bullhorn"></i></div>
+      <p>Noch keine Ankündigungen vorhanden.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Modal: Add Announcement -->
+<div class="modal-overlay" id="modal-add-ann" hidden>
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <h2 class="modal-title"><i class="fas fa-plus"></i> Neue Ankündigung</h2>
+      <button class="modal-close" onclick="closeModal('modal-add-ann')"><i class="fas fa-xmark"></i></button>
+    </div>
+    <form method="post" action="{{ url_for('admin.create_announcement') }}" class="modal-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% include 'admin/_announcement_form.html' %}
+      <div class="modal-footer">
+        <button type="button" class="btn btn--ghost" onclick="closeModal('modal-add-ann')">Abbrechen</button>
+        <button type="submit" class="btn btn--primary"><i class="fas fa-plus"></i> Erstellen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Edit Announcement -->
+<div class="modal-overlay" id="modal-edit-ann" hidden>
+  <div class="modal modal--sm">
+    <div class="modal-header">
+      <h2 class="modal-title"><i class="fas fa-pen"></i> Ankündigung bearbeiten</h2>
+      <button class="modal-close" onclick="closeModal('modal-edit-ann')"><i class="fas fa-xmark"></i></button>
+    </div>
+    <form method="post" id="edit-ann-form" class="modal-form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      {% include 'admin/_announcement_form.html' %}
+      <div class="modal-footer">
+        <button type="button" class="btn btn--ghost" onclick="closeModal('modal-edit-ann')">Abbrechen</button>
+        <button type="submit" class="btn btn--primary"><i class="fas fa-floppy-disk"></i> Speichern</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% block scripts %}
+<script>
+  const CSRF_TOKEN = {{ csrf_token|tojson }};
+
+  // ISO string -> value for <input type=datetime-local> (YYYY-MM-DDTHH:MM)
+  function toLocalInput(iso) {
+    return iso ? iso.slice(0, 16) : '';
+  }
+
+  // Populate and open the edit modal from a serialized announcement
+  function openEditAnnouncement(ann) {
+    const form = document.getElementById('edit-ann-form');
+    if (!form) return;
+    form.action = `/admin/announcements/${ann.id}/edit`;
+    form.querySelector('[name="title"]').value = ann.title || '';
+    form.querySelector('[name="body"]').value = ann.body || '';
+    form.querySelector('[name="severity"]').value = ann.severity || 'info';
+    form.querySelector('[name="is_active"]').checked = !!ann.is_active;
+    form.querySelector('[name="start_at"]').value = toLocalInput(ann.start_at);
+    form.querySelector('[name="end_at"]').value = toLocalInput(ann.end_at);
+    openModal('modal-edit-ann');
+  }
+
+  // Drag-and-drop ordering for the announcements table
+  initDragSort('sortable-announcements', '/api/announcements/reorder');
+</script>
+{% endblock %}
+{% endblock %}

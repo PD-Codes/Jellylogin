@@ -52,6 +52,11 @@
     <i class="fas fa-link"></i>
     Links
   </a>
+  <a href="{{ url_for('admin.announcements') }}"
+     class="admin-subnav-item {{ 'active' if 'announcement' in request.endpoint }}">
+    <i class="fas fa-bullhorn"></i>
+    Ankündigungen
+  </a>
   <a href="{{ url_for('admin.users') }}"
      class="admin-subnav-item {{ 'active' if 'admin.user' in request.endpoint or request.endpoint == 'admin.users' }}">
     <i class="fas fa-users"></i>

@@ -53,7 +53,11 @@ def create_app() -> Flask:
 
     with app.app_context():
         db.create_all()
+        _run_migrations()
         _seed_defaults()
+
+        # Favicon cache directory for fetched site favicons
+        os.makedirs(os.path.join(data_dir, "favicons"), exist_ok=True)
 
     @app.context_processor
     def inject_site_bg():
@@ -153,6 +157,45 @@ def _login_logo_path(data_dir: str):
     return None
 
 
+def _run_migrations():
+    """Apply lightweight schema migrations for existing SQLite databases.
+
+    SQLAlchemy's create_all() creates missing tables but never alters existing
+    ones, so new columns on already-created tables are added here by hand.
+    """
+    from sqlalchemy import text, inspect
+
+    inspector = inspect(db.engine)
+    tables = inspector.get_table_names()
+
+    def _cols(table):
+        return {c["name"] for c in inspector.get_columns(table)}
+
+    def _add(table, ddl):
+        db.session.execute(text(f"ALTER TABLE {table} ADD COLUMN {ddl}"))
+        db.session.commit()
+
+    # link_cards: favicon + role-visibility columns
+    if "link_cards" in tables:
+        cols = _cols("link_cards")
+        if "use_favicon" not in cols:
+            _add("link_cards", "use_favicon BOOLEAN NOT NULL DEFAULT 1")
+        if "admin_only" not in cols:
+            _add("link_cards", "admin_only BOOLEAN NOT NULL DEFAULT 0")
+
+    # categories: role-visibility column
+    if "categories" in tables and "admin_only" not in _cols("categories"):
+        _add("categories", "admin_only BOOLEAN NOT NULL DEFAULT 0")
+
+    # announcements: scheduling window columns
+    if "announcements" in tables:
+        cols = _cols("announcements")
+        if "start_at" not in cols:
+            _add("announcements", "start_at DATETIME")
+        if "end_at" not in cols:
+            _add("announcements", "end_at DATETIME")
+
+
 def _seed_defaults():
     defaults = {
         "site_name": "DKS Media Hub",
@@ -161,12 +204,14 @@ def _seed_defaults():
         "status_cache_seconds": "60",
         "allow_jellyfin_login": "false",
         "setup_complete": "false",
-        "announcement": "",
-        "announcement_type": "info",
         "plugin_secret": "",
         "bg_type": "none",
         "bg_value": "",
         "bg_overlay": "0.5",
+        # Jellyfin "recently added" section on the dashboard
+        "show_latest_media": "false",
+        "latest_media_count": "8",
+        "latest_media_cache_seconds": "300",
         # Login-page designer
         "login_logo_type": "icon",
         "login_logo_icon": "fas fa-play-circle",
